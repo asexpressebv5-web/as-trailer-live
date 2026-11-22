@@ -126,7 +126,7 @@ $('driverTab').onclick=()=>mode('driver');$('adminTab').onclick=()=>mode('admin'
 async function begin(t,m){
  const data=await api('list',t);
  if(!Array.isArray(data.slots)||data.slots.length!==14)throw new Error('De live parkeerplaatsen zijn niet beschikbaar.');
- auth=t;parkingData=data.slots;currentMode=m;
+ auth=t;window.__as3dActiveToken=t;parkingData=data.slots;currentMode=m;
  $('gate').hidden=true;$('app').hidden=false;$('exit').hidden=false;
  setToken(t,m);window.dispatchEvent(new CustomEvent('as-auth-ok',{detail:{slots:data.slots}}));
 }
@@ -145,7 +145,7 @@ $('submit').onclick=async()=>{
  finally{$('submit').disabled=false}
 };
 ['username','password','adminCode'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')$('submit').click()}));
-$('exit').onclick=async()=>{if(currentMode==='driver'&&auth.startsWith('driver:')){try{await api('driver_logout',auth,{})}catch{}}clearToken(currentMode);auth='';parkingData=[];location.reload()};
+$('exit').onclick=async()=>{if(currentMode==='driver'&&auth.startsWith('driver:')){try{await api('driver_logout',auth,{})}catch{}}clearToken(currentMode);auth='';window.__as3dActiveToken='';parkingData=[];location.reload()};
 (async()=>{for(const m of ['driver','admin']){const t=tokenFor(m);if(!t)continue;try{await begin(t,m);return}catch{clearToken(m)}}})();
 </script>
 <script type="module">
@@ -331,7 +331,7 @@ fitCamera();frame();
 async function refresh(){
  if(!$('app').hidden){
   try{
-   const credential=sessionStorage.getItem('as_yard_2026_planner_access_session_v1')||localStorage.getItem('as_yard_2026_driver_access_v1')||'';
+   const credential=window.__as3dActiveToken||'';
    if(!credential)throw new Error('Log opnieuw in.');
    const resp=await fetch('https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live?api=list',{headers:{'x-yard-access':credential},cache:'no-store'});
    if(!resp.ok)throw new Error('Geen live toegang ('+resp.status+')');
@@ -347,7 +347,9 @@ window.addEventListener('as-auth-ok',async ev=>{
 });
 try{
  await createRealBuildings();buildStalls();setupLamps();updateLights();resize();
+ sceneReady=true;
  window.dispatchEvent(new Event('as-three-ready'));
+ if(!$('app').hidden)await refresh();
 }catch(e){$('loaderror').hidden=false;$('loaderror').textContent='3D-model kon niet starten: '+e.message+'. Controleer internetverbinding of probeer Chrome/Edge.';console.error(e)}
 setInterval(()=>refresh(),20000);
 setInterval(updateLights,60000);
