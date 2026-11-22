@@ -23,11 +23,16 @@ label{display:block;margin-bottom:6px;font-size:13px;color:#c2d9eb}input{width:1
 .password-edit .tip{color:#c1d8e7;font-size:12px}
 .account .driver-name{flex:1 1 160px}
 @media(max-width:530px){.driver-actions{justify-content:flex-start}}
+/* V48: veilige inbedding op een andere A&S-webpagina, met eigen inlogscherm. */
+body.embed-mode>header{display:none}
+body.embed-mode #login{margin:18px auto 14px}
+body.embed-mode.show-board #board{height:100svh;min-height:100svh}
+body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px 9px}
 </style>
 </head><body>
-<header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Parkeren en ophalen · versie 47</div></header>
+<header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Parkeren en ophalen · versie 48</div></header>
 <section id="login">
-<h1>Waar staat mijn trailer?</h1><p>Bekijk de live trailerplaatsen. Nieuw: typ een kenteken om eerder opgeslagen trailers te vinden en bekende gegevens automatisch over te nemen.</p>
+<h1>Waar staat mijn trailer?</h1><p>Bekijk welke trailerplaatsen vrij zijn en zoek een trailer op kenteken of trailernummer. De live plattegrond wijst de juiste plek aan.</p>
 <div class="tabs"><button id="driver" type="button" class="on">🚛 Chauffeur</button><button id="planner" type="button">🗂️ Planning</button></div>
 <div id="driverFields"><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div>
 <div id="plannerFields" class="hidden"><div class="field"><label for="adminCode">Beheercode planning</label><input id="adminCode" type="password" maxlength="100" autocomplete="off" placeholder="Privébeheercode"></div></div>
@@ -46,6 +51,7 @@ label{display:block;margin-bottom:6px;font-size:13px;color:#c2d9eb}input{width:1
 <script>
 (()=>{
 'use strict';
+const EMBED=new URLSearchParams(location.search).get('embed')==='1';if(EMBED)document.body.classList.add('embed-mode');
 const API='https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live', DRIVER='as_yard_2026_driver_access_v1', ADMIN='as_yard_2026_planner_access_session_v1';
 const $=id=>document.getElementById(id);
 let mode=new URLSearchParams(location.search).has('planning')?'admin':'driver',working=false,created='';
