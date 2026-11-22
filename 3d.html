@@ -181,7 +181,7 @@ const pdokParams=new URLSearchParams({
 const pdokUrl='https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?'+pdokParams.toString();
 const aerialMaterial=new THREE.MeshBasicMaterial({transparent:true,opacity:1,side:THREE.DoubleSide,depthWrite:false});
 const aerialMap=new THREE.Mesh(new THREE.PlaneGeometry(425,430),aerialMaterial);
-aerialMap.rotation.x=-Math.PI/2;aerialMap.position.y=-.115;aerialMap.renderOrder=1;
+aerialMap.rotation.x=-Math.PI/2;aerialMap.position.y=.006;aerialMap.renderOrder=1;
 scene.add(aerialMap);
 let aerialReady=false;
 new THREE.TextureLoader().load(pdokUrl,texture=>{
@@ -189,11 +189,11 @@ new THREE.TextureLoader().load(pdokUrl,texture=>{
  aerialMaterial.map=texture;aerialMaterial.needsUpdate=true;aerialReady=true;
  $('aerial').classList.add('active');
 },undefined,err=>{
- aerialMaterial.opacity=0;$('aerial').classList.remove('active');
+ aerialMaterial.opacity=0;aerialMap.visible=false;$('aerial').classList.remove('active');
  $('aerial').textContent='⚠ Luchtfoto niet bereikbaar';
  console.warn('PDOK luchtfoto (fallback bestaande ondergrond)',err);
 });
-$('aerial').onclick=()=>{aerialMap.visible=!aerialMap.visible;$('aerial').classList.toggle('active',aerialMap.visible)};
+$('aerial').onclick=()=>{if(!aerialReady){$('infoTitle').textContent='PDOK-luchtfoto';$('infoText').textContent='De luchtfoto kon niet laden. De oorspronkelijke 3D-terreinondergrond blijft beschikbaar.';return}aerialMap.visible=!aerialMap.visible;$('aerial').classList.toggle('active',aerialMap.visible)};
 const facadeDetails=new THREE.Group();scene.add(facadeDetails);
 $('facades').onclick=()=>{facadeDetails.visible=!facadeDetails.visible;$('facades').classList.toggle('active',facadeDetails.visible)};
 const parking=new THREE.Group();scene.add(parking);
@@ -330,8 +330,8 @@ function setStallStatus(){
  for(const row of liveRows){
   const item=slotMeshes.get(row.slot);if(!item)continue;
   item.asphalt.material.color.set(row.trailer?0xad3d4b:row.confirmed?0x138c65:0x506274);
-  item.asphalt.material.opacity=row.trailer?.46:row.confirmed?.27:.1;
-  item.border.material.color.set(row.trailer?0xf88a9b:row.confirmed?0x50d6ad:0xaac4d6);
+  item.asphalt.material.opacity=row.trailer?.57:row.confirmed?.44:.38;
+  item.border.material.color.set(row.trailer?0xf88a9b:row.confirmed?0x50d6ad:0xf4f7fa);
   const old=slotTrailers.get(row.slot);if(old){item.group.remove(old);slotTrailers.delete(row.slot)}
   if(row.trailer){const model=createTrailer(0,0,row.plate||row.trailer);item.group.add(model);slotTrailers.set(row.slot,model)}
  }
