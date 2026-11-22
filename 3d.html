@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1826">
+<title>A&S Nijmegen | Terrein in 3D – BETA</title>
+<style>
+:root{color-scheme:dark;--bg:#07121f;--panel:#10263a;--line:#375469;--ink:#eef7ff;--muted:#a8c4d8;--mint:#4de3b0;--gold:#ffda91}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
+button,input{font:inherit}button{cursor:pointer}
+[hidden]{display:none!important}
+header{height:64px;display:flex;align-items:center;gap:13px;justify-content:space-between;padding:0 18px;background:#0b2132;border-bottom:1px solid #29495c}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;min-width:0}
+.logotile{width:38px;height:38px;display:grid;place-items:center;background:#1c78aa;border-radius:8px;font-weight:900}
+.title{font-size:17px;font-weight:800;line-height:1.1}
+.caption{color:#9fbfd3;font-size:11px}
+.headerlinks{display:flex;gap:9px;align-items:center}
+.btn,.headerlinks a{color:#e6f6ff;border:1px solid #537b95;background:#193b53;border-radius:9px;padding:9px 12px;text-decoration:none;font-weight:750}
+.btn.primary{background:#167db7;border-color:#60c4ff}
+.btn:hover,.headerlinks a:hover{background:#275470}
+#gate{margin:6vh auto;max-width:455px;padding:24px;background:linear-gradient(145deg,#133048,#0e2336);border:1px solid #416883;border-radius:16px;box-shadow:0 20px 80px #0008}
+#gate h1{font-size:23px;margin:4px 0 10px}
+#gate p{color:var(--muted)}
+.field{display:grid;gap:5px;margin:15px 0}.field label{font-size:12px;color:#c6dfef;font-weight:700}.field input{padding:13px;background:#091a29;color:white;border:1px solid #4f7994;border-radius:9px;font-size:16px;width:100%}
+.tabs{display:flex;gap:8px;margin:19px 0 10px}.tabs button{flex:1;border:1px solid #52738b;background:#1b3548;color:white;border-radius:9px;padding:11px}.tabs button.active{background:#146e9b;border-color:#67c9ff}
+#loginResult{font-size:12px;color:#ffcc95;min-height:17px;margin-top:12px}
+#app{height:calc(100svh - 64px);display:grid;grid-template-columns:minmax(0,1fr) 292px;overflow:hidden}
+#stage{min-width:0;min-height:0;position:relative;overflow:hidden;background:radial-gradient(ellipse at 48% 37%,#253e52,#06101b)}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#tools{position:absolute;left:14px;top:14px;max-width:calc(100% - 28px);display:flex;gap:6px;flex-wrap:wrap}
+.tool{background:#0d2434e8;border:1px solid #41637d;color:#f1fbff;border-radius:9px;padding:8px 11px;font-weight:700;box-shadow:0 5px 18px #0003}
+.tool.active{background:#146f9d;border-color:#91d9ff}
+#viewhint{position:absolute;left:14px;bottom:16px;padding:10px 12px;border:1px solid #304c60;border-radius:9px;background:#0b2237db;font-size:11px;color:#c4dced;max-width:360px}
+#info{position:absolute;right:15px;bottom:14px;background:#0a2536e8;border:1px solid #416782;border-radius:11px;padding:10px 13px;max-width:265px;box-shadow:0 5px 22px #0006}
+#info strong{font-size:14px}#info .sub{font-size:12px;color:#c9dce8;margin-top:4px}
+aside{overflow:auto;background:#0f2436;border-left:1px solid #294759;padding:16px 13px 25px}
+aside h2{margin:2px 0 5px;font-size:16px}
+aside p{color:var(--muted);font-size:12px;margin:3px 0 12px}
+.status{background:#0b1c2b;border:1px solid #31556c;border-radius:9px;padding:9px;margin:10px 0 13px;font-weight:700;font-size:12px}
+.status.ok{border-color:#238668;color:#b4fbe1}
+.key{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#b4cbdc;margin:8px 0 12px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;margin-right:5px}
+.dot.free{background:#30d6a0}.dot.busy{background:#f66e81}.dot.unknown{background:#8fa2b5}
+#slotList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.slot{background:#172e40;border:1px solid #47617a;border-left:5px solid #859aab;border-radius:9px;padding:9px;text-align:left;min-height:54px;color:#effaff}
+.slot strong{display:block;font-size:14px}.slot small{font-size:10px;color:#b8d3e4;display:block;overflow-wrap:anywhere}
+.slot.free{border-left-color:#37dfad;background:#114037}.slot.busy{border-left-color:#ff7d8b;background:#542934}
+.slot.selected{outline:2px solid #6ed3ff;outline-offset:1px}
+aside .foot{margin-top:15px;padding-top:12px;border-top:1px solid #345164;color:#91b2c7;font-size:10px}
+#loaderror{position:absolute;inset:0;display:grid;place-items:center;background:#0a1422ed;z-index:9;padding:28px;text-align:center;font-size:15px}
+@media(max-width:790px){
+ header{height:60px;padding:0 9px}.title{font-size:14px}.caption{font-size:9px}
+ .headerlinks a,.headerlinks button{font-size:11px;padding:7px 8px}
+ #app{height:auto;min-height:calc(100svh - 60px);display:flex;flex-direction:column;overflow:visible}
+ #stage{height:min(63svh,650px);min-height:390px;flex:0 0 auto}
+ aside{overflow:visible;border-left:none;border-top:1px solid #41637b;padding:13px}
+ #slotList{grid-template-columns:repeat(4,minmax(0,1fr))}
+ #tools{left:8px;top:8px;max-width:calc(100% - 16px)}.tool{font-size:11px;padding:7px 8px}
+ #viewhint{left:8px;bottom:8px;padding:7px 8px;font-size:10px;max-width:42%}
+ #info{right:8px;bottom:8px;max-width:52%;font-size:11px}
+}
+@media(max-width:390px){#slotList{grid-template-columns:repeat(3,minmax(0,1fr))}.headerlinks{gap:4px}#stage{min-height:345px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.171.0/examples/jsm/"}}</script>
+</head>
+<body>
+<header>
+<a class="logo" href="./" title="Terug naar bestaand trailerbord"><span class="logotile">A&S</span><span><span class="title">A&S Terrein · 3D</span><span class="caption" style="display:block">Hogelandseweg 53–55, Nijmegen · BETA</span></span></a>
+<div class="headerlinks"><a href="./">2D plattegrond</a><button class="btn" id="exit" hidden>Uitloggen</button></div>
+</header>
+<section id="gate">
+<h1>Virtueel A&S-terrein in 3D</h1>
+<p>Bekijk de echte 3DBAG-gebouwvormen, draai 360°, en zie de actuele trailers uit het live parkeerbord. De parkeerplaatsen zijn nog <b>schematisch geplaatst</b> en nog niet landmeetkundig gekoppeld aan de gebouwen.</p>
+<div class="tabs"><button id="driverTab" class="active" type="button">🚛 Chauffeur</button><button id="adminTab" type="button">⚙ Planning</button></div>
+<div id="driverFields">
+<div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" autocomplete="username"></div>
+<div class="field"><label for="password">Wachtwoord</label><input id="password" type="password" autocomplete="current-password"></div>
+</div>
+<div id="adminFields" hidden><div class="field"><label for="adminCode">Beheercode planning</label><input id="adminCode" type="password" autocomplete="off"></div></div>
+<button class="btn primary" id="submit" style="width:100%;padding:13px" type="button">Inloggen en 3D openen</button><div id="loginResult" aria-live="polite"></div>
+<p style="font-size:11px">Je kunt je bestaande A&S-chauffeursaccount gebruiken. Een 3D-model verandert geen parkeerregistraties.</p>
+</section>
+<main id="app" hidden>
+<section id="stage" aria-label="Interactieve 3D-weergave A&S Expresse">
+<div id="tools">
+<button class="tool active" id="perspective" type="button">3D draaien</button>
+<button class="tool" id="topview" type="button">Bovenaanzicht</button>
+<button class="tool" id="focus53" type="button">Gebouw 53</button>
+<button class="tool" id="resetview" type="button">Alles bekijken</button>
+<button class="tool" id="dayNight" type="button">🌙 Nacht</button>
+</div>
+<div id="viewhint">Sleep met je vinger om te draaien · knijp om te zoomen · tik op een trailerplek voor informatie</div>
+<div id="info"><strong id="infoTitle">Echte 3D-gebouwvormen</strong><div class="sub" id="infoText">3DBAG-gegevens laden…</div></div>
+<div id="loaderror" hidden></div>
+</section>
+<aside>
+<h2>🚛 Live trailerplaatsen</h2>
+<p>Dit zijn de bestaande T01–T14-registraties, gekoppeld aan de 3D-weergave. Klik een vak op de kaart of hieronder.</p>
+<div id="liveStatus" class="status">Live status laden…</div>
+<div class="key"><span><span class="dot free"></span>Vrij</span><span><span class="dot busy"></span>Bezet</span><span><span class="dot unknown"></span>Controleren</span></div>
+<div id="slotList"></div>
+<div class="foot">
+<strong>Bron 3D-gebouwen:</strong> <a href="https://3dbag.nl/" target="_blank" rel="noopener" style="color:#9fd8ff">3DBAG</a>, 3D geoinformation research group (TU Delft) en 3DGI, CC BY 4.0. Hoogtes/daken uit geregistreerde 3D-geometrie. Gebouw 55 en de parkeerlocaties moeten nog nader worden ingemeten. Geen Google Earth-extractie.
+<br><br>De 3D-app is voorlopig alleen om te bekijken. Parkeren en ophalen blijft via het bestaande <a href="./" style="color:#9fd8ff">2D-trailerbord</a> werken.
+</div>
+</aside>
+</main>
+<script>
+const API='https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live';
+const DRIVER='as_yard_2026_driver_access_v1',ADMIN='as_yard_2026_planner_access_session_v1';
+const $=id=>document.getElementById(id);
+let currentMode='driver',auth='',parkingData=[];
+function tokenFor(mode){try{return (mode==='admin'?sessionStorage:localStorage).getItem(mode==='admin'?ADMIN:DRIVER)||''}catch{return ''}}
+function setToken(token,mode){try{(mode==='admin'?sessionStorage:localStorage).setItem(mode==='admin'?ADMIN:DRIVER,token)}catch{}}
+function clearToken(mode){try{(mode==='admin'?sessionStorage:localStorage).removeItem(mode==='admin'?ADMIN:DRIVER)}catch{}}
+function status(s){$('loginResult').textContent=s}
+async function api(path,token,payload){
+ const resp=await fetch(API+'?api='+encodeURIComponent(path),{method:payload===undefined?'GET':'POST',headers:{'x-yard-access':token,...(payload===undefined?{}:{'content-type':'application/json'})},body:payload===undefined?undefined:JSON.stringify(payload),cache:'no-store'});
+ let json={};try{json=await resp.json()}catch{}
+ if(!resp.ok)throw new Error(json.error||'Server reageert niet ('+resp.status+')');
+ return json;
+}
+function mode(m){currentMode=m;$('driverFields').hidden=m==='admin';$('adminFields').hidden=m!=='admin';$('driverTab').classList.toggle('active',m==='driver');$('adminTab').classList.toggle('active',m==='admin')}
+$('driverTab').onclick=()=>mode('driver');$('adminTab').onclick=()=>mode('admin');
+async function begin(t,m){
+ const data=await api('list',t);
+ if(!Array.isArray(data.slots)||data.slots.length!==14)throw new Error('De live parkeerplaatsen zijn niet beschikbaar.');
+ auth=t;parkingData=data.slots;currentMode=m;
+ $('gate').hidden=true;$('app').hidden=false;$('exit').hidden=false;
+ setToken(t,m);window.dispatchEvent(new CustomEvent('as-auth-ok',{detail:{slots:data.slots}}));
+}
+$('submit').onclick=async()=>{
+ $('submit').disabled=true;status('Inloggen…');
+ try{
+  let t;
+  if(currentMode==='driver'){
+   const u=$('username').value.trim().toLowerCase(),password=$('password').value;
+   if(!u||!password)throw new Error('Vul gebruikersnaam en wachtwoord in.');
+   const result=await api('driver_login','',{login:u,password});t='driver:'+result.token;
+   $('password').value='';
+  }else{t=$('adminCode').value.trim();if(!t)throw new Error('Vul de beheercode in.')}
+  await begin(t,currentMode);status('');
+ }catch(e){status('⚠ '+e.message)}
+ finally{$('submit').disabled=false}
+};
+['username','password','adminCode'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')$('submit').click()}));
+$('exit').onclick=async()=>{if(currentMode==='driver'&&auth.startsWith('driver:')){try{await api('driver_logout',auth,{})}catch{}}clearToken(currentMode);auth='';parkingData=[];location.reload()};
+(async()=>{for(const m of ['driver','admin']){const t=tokenFor(m);if(!t)continue;try{await begin(t,m);return}catch{clearToken(m)}}})();
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const $=id=>document.getElementById(id);
+const stage=$('stage');
+const scene=new THREE.Scene();scene.background=new THREE.Color('#091724');scene.fog=new THREE.Fog('#091724',165,390);
+const camera=new THREE.PerspectiveCamera(48,1,.1,900);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.6;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.insertBefore(renderer.domElement,stage.firstChild);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.enableDamping=true;orbit.dampingFactor=.07;orbit.maxPolarAngle=Math.PI*.49;orbit.minDistance=18;orbit.maxDistance=350;orbit.target.set(45,2,15);
+const hemi=new THREE.HemisphereLight(0xd9eaff,0x3a5362,2.3);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffefda,3.1);sun.position.set(-60,120,-85);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-185;sun.shadow.camera.right=185;sun.shadow.camera.top=185;sun.shadow.camera.bottom=-185;sun.shadow.normalBias=.025;scene.add(sun);
+const ambient=new THREE.AmbientLight(0x92b5db,.2);scene.add(ambient);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(425,430),new THREE.MeshStandardMaterial({color:0x122734,roughness:.98}));ground.rotation.x=-Math.PI/2;ground.position.y=-.12;ground.receiveShadow=true;scene.add(ground);
+const hardstand=new THREE.Mesh(new THREE.PlaneGeometry(258,262),new THREE.MeshStandardMaterial({color:0x354c56,roughness:1,metalness:0}));hardstand.rotation.x=-Math.PI/2;hardstand.position.set(33,-.07,-5);hardstand.receiveShadow=true;scene.add(hardstand);
+const grid=new THREE.GridHelper(425,85,0x1c394b,0x233c4e);grid.position.y=-.045;scene.add(grid);
+const parking=new THREE.Group();scene.add(parking);
+const buildings=new THREE.Group();scene.add(buildings);
+const lamps=new THREE.Group();scene.add(lamps);
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+const slotMeshes=new Map(),slotBadges=new Map(),slotTrailers=new Map();
+let buildingCount=0,sceneReady=false,liveRows=[],selected='T01',manualNight=null;
+const safe=(s)=>String(s||'').slice(0,80);
+function labelSprite(text,color='#e7f6ff',bg='#102b40'){
+ const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
+ const ctx=canvas.getContext('2d');ctx.fillStyle=bg;ctx.beginPath();ctx.roundRect(4,6,504,115,16);ctx.fill();
+ ctx.strokeStyle='#4c7a94';ctx.lineWidth=4;ctx.stroke();
+ ctx.fillStyle=color;ctx.font='bold 45px system-ui,Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(safe(text),256,65,476);
+ const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;
+ const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+ const sprite=new THREE.Sprite(mat);sprite.scale.set(14,3.5,1);return sprite;
+}
+function createSurfaceMesh(building,kind){
+ const positions=[];
+ for(const surface of building.f){
+  if(surface.k!==kind)continue;
+  for(const ring of surface.r.slice(0,1)){
+   let inds=ring.slice();
+   if(inds.length>3 && inds[0]===inds[inds.length-1])inds.pop();
+   if(inds.length<3)continue;
+   const verts=inds.map(i=>new THREE.Vector3(...building.v[i])).filter(v=>Number.isFinite(v.x+v.y+v.z));
+   if(verts.length<3)continue;
+   const n=new THREE.Vector3();
+   for(let i=0;i<verts.length;i++){
+    const a=verts[i],b=verts[(i+1)%verts.length];
+    n.x+=(a.y-b.y)*(a.z+b.z);n.y+=(a.z-b.z)*(a.x+b.x);n.z+=(a.x-b.x)*(a.y+b.y);
+   }
+   const ax=Math.abs(n.x),ay=Math.abs(n.y),az=Math.abs(n.z);
+   const uv=verts.map(p=>ay>=ax&&ay>=az?new THREE.Vector2(p.x,p.z):ax>=az?new THREE.Vector2(p.z,p.y):new THREE.Vector2(p.x,p.y));
+   let triangles;
+   try{triangles=THREE.ShapeUtils.triangulateShape(uv,[])}catch{triangles=[]}
+   for(const t of triangles)for(const idx of t){const p=verts[idx];if(p)positions.push(p.x,p.y,p.z)}
+  }
+ }
+ if(!positions.length)return null;
+ const geo=new THREE.BufferGeometry();
+ geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+ geo.computeVertexNormals();
+ const mat=new THREE.MeshStandardMaterial({color:kind==='r'?0xc1cbd4:0x8c9eac,metalness:kind==='r'?.56:.13,roughness:kind==='r'?.62:.85,side:THREE.DoubleSide});
+ const mesh=new THREE.Mesh(geo,mat);mesh.castShadow=true;mesh.receiveShadow=true;
+ mesh.userData={type:'building',id:building.id,year:building.year,roof:building.sourceRoof,ground:building.sourceGround,role:building.role,area:building.area};
+ return mesh;
+}
+async function createRealBuildings(){
+ const res=await fetch('./3d/gebouwen-3dbag.json',{cache:'force-cache'});
+ if(!res.ok)throw new Error('De officiële 3DBAG-gebouwgegevens konden niet worden geladen.');
+ const data=await res.json();
+ if(!Array.isArray(data.buildings)||data.buildings.length<2)throw new Error('Onvolledige 3D-geometrie');
+ let rootLabelCount=0;
+ for(const b of data.buildings){
+  let added=0;
+  for(const kind of ['r','w']){const mesh=createSurfaceMesh(b,kind);if(mesh){buildings.add(mesh);added++}}
+  if(!added)continue;
+  buildingCount++;
+  if(b.role==='adres53'||b.role==='kandidaat55'){
+    const center=b.v.reduce((a,v)=>{a.x+=v[0];a.y+=v[1];a.z+=v[2];return a},{x:0,y:0,z:0});
+    center.x/=b.v.length;center.y/=b.v.length;center.z/=b.v.length;
+    const label=labelSprite(b.role==='adres53'?'GEBOUW 53':'HAL NABIJ 55', '#fff2d6');
+    label.position.set(center.x,(b.sourceRoof-9)+5,center.z);
+    buildings.add(label);rootLabelCount++;
+  }
+ }
+ $('infoText').textContent=buildingCount+' panden geladen uit echte 3DBAG-gebouwgeometrie. Tik op een pand of trailerplek.';
+}
+function stall(id,x,z){
+ const group=new THREE.Group();group.position.set(x,0,z);group.userData.slot=id;
+ const asphalt=new THREE.Mesh(new THREE.PlaneGeometry(4.35,13.8),new THREE.MeshBasicMaterial({color:0x6d8797,transparent:true,opacity:.07,side:THREE.DoubleSide}));
+ asphalt.rotation.x=-Math.PI/2;asphalt.position.y=.012;group.add(asphalt);
+ const points=[[-2.17,-6.8],[-2.17,6.8],[2.17,6.8],[2.17,-6.8]];
+ const verts=[];for(let i=0;i<3;i++){verts.push(new THREE.Vector3(points[i][0],.065,points[i][1]),new THREE.Vector3(points[i+1][0],.065,points[i+1][1]))}
+ const border=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(verts),new THREE.LineBasicMaterial({color:0xb2cdda,transparent:true,opacity:.9}));group.add(border);
+ const marker=labelSprite(id);marker.scale.set(4.2,1.35,1);marker.position.y=2.2;group.add(marker);slotBadges.set(id,marker);
+ const clickable=new THREE.Mesh(new THREE.BoxGeometry(4.6,.2,13.9),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));clickable.position.y=.18;clickable.userData.slot=id;group.add(clickable);slotMeshes.set(id,{group,clickable,asphalt,border});
+ parking.add(group);
+}
+function buildStalls(){
+ for(let i=0;i<12;i++){const row=Math.floor(i/6),col=i%6;
+  stall('T'+String(i+1).padStart(2,'0'),119+col*5.6,row===0?-72:-48);
+ }
+ stall('T13',25,-75);stall('T14',19,-75);
+ const info=labelSprite('LIVE TRAILERPLEKKEN (SCHEMATISCH)','#d5f5ff','#12384b');info.scale.set(48,4.2,1);info.position.set(132,5,-90);parking.add(info);
+}
+function createTrailer(x,z,plate){
+ const group=new THREE.Group();group.position.set(0,0,0);
+ const body=new THREE.Mesh(new THREE.BoxGeometry(3.1,3.4,10.7),new THREE.MeshStandardMaterial({color:0xe8eef2,metalness:.28,roughness:.6}));body.position.set(0,2.3,0);body.castShadow=true;group.add(body);
+ const chassis=new THREE.Mesh(new THREE.BoxGeometry(3.05,.23,12),new THREE.MeshStandardMaterial({color:0x202c39}));chassis.position.y=.7;group.add(chassis);
+ for(let i of [-4,3.4,4.3])for(let side of [-1,1]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.46,.46,.28,12),new THREE.MeshStandardMaterial({color:0x151b22,roughness:.98}));wheel.rotation.z=Math.PI/2;wheel.position.set(side*1.5,.48,i);group.add(wheel)}
+ const plateLabel=labelSprite(plate||'TRAILER','#0e2334','#d8eff8');plateLabel.scale.set(5.5,1.45,1);plateLabel.position.set(0,4.75,0);group.add(plateLabel);
+ return group;
+}
+function setStallStatus(){
+ for(const row of liveRows){
+  const item=slotMeshes.get(row.slot);if(!item)continue;
+  item.asphalt.material.color.set(row.trailer?0xad3d4b:row.confirmed?0x138c65:0x506274);
+  item.asphalt.material.opacity=row.trailer?.46:row.confirmed?.27:.1;
+  item.border.material.color.set(row.trailer?0xf88a9b:row.confirmed?0x50d6ad:0xaac4d6);
+  const old=slotTrailers.get(row.slot);if(old){item.group.remove(old);slotTrailers.delete(row.slot)}
+  if(row.trailer){const model=createTrailer(0,0,row.plate||row.trailer);item.group.add(model);slotTrailers.set(row.slot,model)}
+ }
+}
+function renderCards(){
+ const list=$('slotList');list.replaceChildren();
+ for(const row of liveRows){
+  const btn=document.createElement('button');btn.type='button';
+  btn.className='slot '+(row.trailer?'busy':row.confirmed?'free':'')+(row.slot===selected?' selected':'');
+  const strong=document.createElement('strong');strong.textContent=row.slot;
+  const small=document.createElement('small');small.textContent=row.trailer?(row.carrier||'TRAILER')+' · '+(row.plate||row.trailer):row.confirmed?'✓ VRIJ':'? CONTROLEREN';
+  btn.append(strong,small);btn.onclick=()=>chooseSlot(row.slot,true);list.append(btn);
+ }
+}
+function chooseSlot(id,move){
+ selected=id;renderCards();
+ const r=liveRows.find(e=>e.slot===id),mat=slotMeshes.get(id);
+ $('infoTitle').textContent='Parkeerplaats '+id;
+ $('infoText').textContent=!r?'Geen live gegevens':r.trailer?
+    (r.carrier||'Vervoerder onbekend')+' · Kenteken: '+(r.plate||r.trailer)+(r.other_trailer?' · Ander nummer: '+r.other_trailer:''):
+    r.confirmed?'Bevestigd vrij. Je kunt hier een trailer parkeren via het 2D-bord.':'Nog niet gecontroleerd. Controleer fysiek of de plek vrij is.';
+ if(move&&mat){orbit.target.copy(mat.group.position);camera.position.set(mat.group.position.x+19,32,mat.group.position.z+25);orbit.update()}
+}
+function updateLights(){
+ const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',hour:'2-digit',hourCycle:'h23'}).format(new Date());
+ const hour=Number(localParts);
+ const night=manualNight===null?(hour<7||hour>=18):manualNight;
+ scene.background.set(night?'#070d1a':'#163244');scene.fog.color.copy(scene.background);
+ hemi.intensity=night?1.5:2.3;sun.intensity=night?.25:3.1;
+ for(const bulb of lamps.children)bulb.intensity=night?2.4:0;
+ renderer.toneMappingExposure=night?1.85:1.6;
+ $('dayNight').textContent=night?'☀️ Dag':'🌙 Nacht';
+ $('dayNight').classList.toggle('active',night);
+}
+function setupLamps(){
+ for(const x of [-36,28,92,154])for(const z of [-75,-5,65]){
+ const pole=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,9,8),new THREE.MeshStandardMaterial({color:0x788997,metalness:.7,roughness:.46}));pole.position.set(x,4.5,z);scene.add(pole);
+ const lamp=new THREE.PointLight(0xffe4ab,0,28,2);lamp.position.set(x,9,z);lamps.add(lamp);
+ const bulb=new THREE.Mesh(new THREE.BoxGeometry(.9,.32,.9),new THREE.MeshBasicMaterial({color:0xffe1a1}));bulb.position.set(x,9,z);scene.add(bulb);
+ }
+}
+function fitCamera(){camera.position.set(180,135,188);orbit.target.set(46,2,4);orbit.update()}
+$('resetview').onclick=()=>fitCamera();
+$('topview').onclick=()=>{camera.position.set(52,175,7);orbit.target.set(52,0,7);orbit.update()};
+$('perspective').onclick=()=>fitCamera();
+$('focus53').onclick=()=>{camera.position.set(35,41,41);orbit.target.set(-2,5,0);orbit.update()};
+$('dayNight').onclick=()=>{manualNight=manualNight===null?true:!manualNight;updateLights()};
+renderer.domElement.addEventListener('pointerup',ev=>{
+ if(ev.pointerType==='touch'&&ev.isPrimary===false)return;
+ const rect=renderer.domElement.getBoundingClientRect();
+ pointer.set((ev.clientX-rect.left)/rect.width*2-1,-((ev.clientY-rect.top)/rect.height*2-1));
+ raycaster.setFromCamera(pointer,camera);
+ const hits=raycaster.intersectObjects(Array.from(slotMeshes.values()).map(m=>m.clickable),false);
+ if(hits.length)chooseSlot(hits[0].object.userData.slot,false);
+});
+function resize(){
+ const w=Math.max(260,stage.clientWidth),h=Math.max(260,stage.clientHeight);renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+function frame(){requestAnimationFrame(frame);orbit.update();renderer.render(scene,camera)}
+fitCamera();frame();
+async function refresh(){
+ if(!$('app').hidden){
+  try{
+   const credential=sessionStorage.getItem('as_yard_2026_planner_access_session_v1')||localStorage.getItem('as_yard_2026_driver_access_v1')||'';
+   if(!credential)throw new Error('Log opnieuw in.');
+   const resp=await fetch('https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live?api=list',{headers:{'x-yard-access':credential},cache:'no-store'});
+   if(!resp.ok)throw new Error('Geen live toegang ('+resp.status+')');
+   const data=await resp.json();if(data.slots.length!==14)throw new Error('Onvolledige planning');
+   liveRows=data.slots;renderCards();setStallStatus();
+   $('liveStatus').className='status ok';$('liveStatus').textContent='● LIVE · '+new Date().toLocaleTimeString('nl-NL')+' · '+liveRows.filter(r=>r.trailer).length+' bezet · '+liveRows.filter(r=>r.confirmed&&!r.trailer).length+' vrij';
+  }catch(e){$('liveStatus').className='status';$('liveStatus').textContent='⚠ '+e.message}
+ }
+}
+window.addEventListener('as-auth-ok',async ev=>{
+ liveRows=ev.detail.slots;renderCards();setStallStatus();chooseSlot('T01',false);
+ $('liveStatus').className='status ok';$('liveStatus').textContent='● LIVE · '+new Date().toLocaleTimeString('nl-NL');
+});
+try{
+ await createRealBuildings();buildStalls();setupLamps();updateLights();resize();
+ window.dispatchEvent(new Event('as-three-ready'));
+}catch(e){$('loaderror').hidden=false;$('loaderror').textContent='3D-model kon niet starten: '+e.message+'. Controleer internetverbinding of probeer Chrome/Edge.';console.error(e)}
+setInterval(()=>refresh(),20000);
+setInterval(updateLights,60000);
+</script>
+</body>
+</html>
