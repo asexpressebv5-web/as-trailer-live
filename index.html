@@ -12,9 +12,19 @@ label{display:block;margin-bottom:6px;font-size:13px;color:#c2d9eb}input{width:1
 .floating{display:none;position:fixed;z-index:1000;bottom:14px;right:14px;background:#10283a;color:#d9f0ff;border:1px solid #5f89a5;border-radius:12px;padding:10px 13px;box-shadow:0 6px 22px #0007}body.show-board .floating{display:block}#manage{right:auto;left:14px;background:#146a9e}#manage[hidden]{display:none!important}
 #managePanel{display:none;position:fixed;z-index:1100;inset:0;background:rgba(3,12,22,.92);overflow:auto;padding:18px}#managePanel.open{display:block}.manage-card{max-width:800px;margin:3vh auto;padding:21px;background:#142c43;border:1px solid #587994;border-radius:14px}.manage-top{display:flex;justify-content:space-between;gap:12px;align-items:center}.manage-top h2{margin:0;font-size:21px}.subtle{font-size:12px;color:#b9d2e2}.line{border:0;border-top:1px solid #46617a;margin:19px 0}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.row .field{flex:1 1 160px;margin:0}.small-button{padding:10px 14px;background:#1e587b;color:white;border:1px solid #619bb9;border-radius:9px;font-weight:700}.red{background:#6d2f39;border-color:#a24e59}.notice{padding:12px;margin:12px 0;border:1px solid #4d738d;background:#1a3e57;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}.accounts{display:grid;gap:8px;margin-top:14px}.account{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border:1px solid #3d607a;border-radius:9px;background:#10243a}.account strong{display:block}.account small{display:block;color:#b3cadd}.login-info{font-size:12px;margin:8px 0;color:#b2c9dd}.hidden{display:none!important}
 @media(max-width:530px){header{padding:9px 12px}section#login{margin:17px 12px;padding:17px;border-radius:12px}h1{font-size:21px}#board{height:100svh;min-height:100svh}.manage-card{padding:13px}#managePanel{padding:8px}.floating{font-size:12px;padding:8px 10px}}
+
+.driver-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.driver-actions .small-button{font-size:12px;padding:8px 10px}
+.password-edit{flex:1 1 100%;border-top:1px solid #41617b;padding:12px 0 2px;display:grid;gap:9px}
+.password-edit .field{margin:0}
+.password-edit .field input{width:100%;max-width:480px}
+.password-edit .driver-actions{justify-content:flex-start}
+.password-edit .tip{color:#c1d8e7;font-size:12px}
+.account .driver-name{flex:1 1 160px}
+@media(max-width:530px){.driver-actions{justify-content:flex-start}}
 </style>
 </head><body>
-<header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Parkeren en ophalen · versie 33</div></header>
+<header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Parkeren en ophalen · versie 34</div></header>
 <section id="login">
 <h1>Waar staat mijn trailer?</h1><p>Log in en bekijk welke trailer op T01–T14 staat. Groen: bevestigd vrij. Rood: bezet. Bij parkeren kun je een eerder gebruikte trailer kiezen. Vervoerder, kenteken en extra trailernummer worden dan automatisch ingevuld.</p>
 <div class="tabs"><button id="driver" type="button" class="on">🚛 Chauffeur</button><button id="planner" type="button">🗂️ Planning</button></div>
@@ -26,7 +36,7 @@ label{display:block;margin-bottom:6px;font-size:13px;color:#c2d9eb}input{width:1
 <button id="manage" type="button" class="floating" hidden>⚙ Chauffeursbeheer</button><button id="exit" type="button" class="floating">↩ Uitloggen</button>
 <section id="managePanel" aria-label="Chauffeursbeheer" role="dialog" aria-modal="true" aria-labelledby="manageTitle"><div class="manage-card">
 <div class="manage-top"><h2 id="manageTitle">Chauffeursbeheer</h2><button type="button" id="closeManage" class="small-button">Sluiten</button></div>
-<p>Maak persoonlijke inloggegevens aan. Iedere chauffeur kan daarna zelf parkeren en ophalen. Een wachtwoord is alleen bij het aanmaken zichtbaar.</p>
+<p>Maak chauffeursaccounts aan, wijzig of herstel hun wachtwoord en verwijder accounts definitief. Alleen planning beheert wachtwoorden. Bij wijziging wordt de chauffeur op alle apparaten uitgelogd.</p>
 <form id="createDriver" class="row"><div class="field"><label for="newName">Naam chauffeur</label><input id="newName" required maxlength="90" placeholder="Voornaam achternaam"></div><div class="field"><label for="newLogin">Gebruikersnaam</label><input id="newLogin" required maxlength="40" pattern="[a-z0-9._-]{3,40}" autocapitalize="none" placeholder="bijv. voornaam.achternaam"></div><button type="submit" class="small-button">+ Chauffeur toevoegen</button></form>
 <div id="createdSecret" class="notice hidden" role="status" aria-live="polite"></div><button id="copyCredentials" class="small-button hidden" type="button">Inloggegevens kopiëren</button><div id="manageMsg" class="subtle" aria-live="polite"></div>
 <hr class="line"><div class="manage-top"><h3>Chauffeursaccounts</h3><button id="refreshDrivers" type="button" class="small-button">Verversen</button></div><div id="driverList" class="accounts"></div>
@@ -76,13 +86,83 @@ async function autoLogin(){const token=get();if(!token)return;if(mode==='driver'
 async function logout(){const token=get();if(mode==='driver'&&token.startsWith('driver:')){try{await request('driver_logout',{},token)}catch{}}
  clear();$('board').removeAttribute('srcdoc');document.body.classList.remove('show-board');$('managePanel').classList.remove('open');$('manage').hidden=true;message('Uitgelogd.');$('username').focus()}
 function showManage(){if(mode!=='admin')return;$('managePanel').classList.add('open');loadDrivers()}
+function generatePassword(){
+ const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%';
+ const bytes=crypto.getRandomValues(new Uint8Array(20));
+ return Array.from(bytes,b=>alphabet[b%alphabet.length]).join('');
+}
 async function loadDrivers(){
  $('manageMsg').textContent='Accounts worden opgehaald…';
- try{const d=await request('drivers');const list=$('driverList');list.replaceChildren();
-   if(!d.drivers.length){const p=document.createElement('p');p.textContent='Nog geen chauffeursaccounts. Maak hierboven de eerste aan.';list.append(p)}
-   for(const dr of d.drivers){const row=document.createElement('div');row.className='account';const left=document.createElement('div');const name=document.createElement('strong');name.textContent=dr.display_name+(dr.enabled?'':' (geblokkeerd)');const sub=document.createElement('small');sub.textContent='Gebruikersnaam: '+dr.login;left.append(name,sub);row.append(left);
-   if(dr.enabled){const b=document.createElement('button');b.className='small-button red';b.type='button';b.textContent='Toegang blokkeren';b.onclick=async()=>{if(!confirm('Toegang intrekken voor '+dr.display_name+'?'))return;try{await request('driver_disable',{driver_id:dr.id});await loadDrivers()}catch(e){$('manageMsg').textContent=e.message}};row.append(b)}list.append(row)}
-   $('manageMsg').textContent='';
+ try{
+  const d=await request('drivers');const list=$('driverList');list.replaceChildren();
+  if(!d.drivers.length){const p=document.createElement('p');p.textContent='Nog geen chauffeursaccounts. Maak hierboven de eerste aan.';list.append(p)}
+  for(const dr of d.drivers){
+   const row=document.createElement('div');row.className='account';
+   const left=document.createElement('div');left.className='driver-name';
+   const name=document.createElement('strong');name.textContent=dr.display_name+(dr.enabled?'':' (geblokkeerd)');
+   const sub=document.createElement('small');sub.textContent='Gebruikersnaam: '+dr.login;left.append(name,sub);row.append(left);
+   const buttons=document.createElement('div');buttons.className='driver-actions';
+   const passwordButton=document.createElement('button');passwordButton.type='button';passwordButton.className='small-button';passwordButton.textContent='🔑 Wachtwoord wijzigen';
+   const deleteButton=document.createElement('button');deleteButton.type='button';deleteButton.className='small-button red';deleteButton.textContent='✕ Definitief verwijderen';
+   buttons.append(passwordButton);
+   if(dr.enabled){
+     const blockButton=document.createElement('button');blockButton.type='button';blockButton.className='small-button';blockButton.textContent='Blokkeren';
+     blockButton.onclick=async()=>{
+       if(!confirm('Toegang blokkeren voor '+dr.display_name+'?'))return;
+       blockButton.disabled=true;
+       try{await request('driver_disable',{driver_id:dr.id});await loadDrivers();$('manageMsg').textContent='Toegang geblokkeerd voor '+dr.display_name}
+       catch(e){$('manageMsg').textContent=e.message;blockButton.disabled=false}
+     };
+     buttons.append(blockButton);
+   }
+   buttons.append(deleteButton);row.append(buttons);
+   const editor=document.createElement('form');editor.className='password-edit hidden';editor.noValidate=true;
+   const label=document.createElement('label');label.className='field';
+   const span=document.createElement('span');span.textContent='Nieuw wachtwoord voor '+dr.display_name+' (minimaal 12 tekens)';
+   const input=document.createElement('input');input.type='password';input.minLength=12;input.maxLength=80;input.autocomplete='new-password';input.placeholder='Vul zelf een nieuw wachtwoord in';input.required=true;
+   label.append(span,input);
+   const hint=document.createElement('span');hint.className='tip';hint.textContent='Alleen planning kan dit wijzigen. Alle bestaande sessies van de chauffeur worden afgesloten.';
+   const bar=document.createElement('div');bar.className='driver-actions';
+   const create=document.createElement('button');create.type='button';create.className='small-button';create.textContent='Genereer veilig wachtwoord';
+   const show=document.createElement('button');show.type='button';show.className='small-button';show.textContent='Toon wachtwoord';
+   const submit=document.createElement('button');submit.type='submit';submit.className='small-button';submit.textContent='✓ Nieuw wachtwoord opslaan';
+   const cancel=document.createElement('button');cancel.type='button';cancel.className='small-button';cancel.textContent='Annuleren';
+   bar.append(create,show,submit,cancel);editor.append(label,hint,bar);row.append(editor);
+   create.onclick=()=>{input.value=generatePassword();input.type='text';show.textContent='Verberg wachtwoord';input.focus()};
+   show.onclick=()=>{input.type=input.type==='password'?'text':'password';show.textContent=input.type==='password'?'Toon wachtwoord':'Verberg wachtwoord'};
+   passwordButton.onclick=()=>{
+      editor.classList.toggle('hidden');if(!editor.classList.contains('hidden'))input.focus();else input.value='';
+   };
+   cancel.onclick=()=>{editor.classList.add('hidden');input.value=''};
+   editor.onsubmit=async ev=>{
+     ev.preventDefault();const value=input.value;
+     if(value.length<12||value.length>80){$('manageMsg').textContent='Het nieuwe wachtwoord moet tussen 12 en 80 tekens lang zijn.';return}
+     if(!confirm('Nieuw wachtwoord instellen voor '+dr.display_name+'? De chauffeur wordt op alle apparaten uitgelogd.'))return;
+     submit.disabled=true;
+     try{
+       await request('driver_reset_password',{driver_id:dr.id,new_password:value});
+       created='A&S Live Trailerbord\nNaam: '+dr.display_name+'\nWebsite: https://asexpressebv5-web.github.io/as-trailer-live/\nGebruikersnaam: '+dr.login+'\nNieuw wachtwoord: '+value;
+       $('createdSecret').textContent='Wachtwoord gewijzigd. Geef onderstaande gegevens alleen aan deze chauffeur:\n\n'+created;
+       $('createdSecret').classList.remove('hidden');$('copyCredentials').classList.remove('hidden');
+       editor.classList.add('hidden');input.value='';$('manageMsg').textContent='✓ Wachtwoord voor '+dr.display_name+' gewijzigd. Bestaande sessies beëindigd.';
+     }catch(e){$('manageMsg').textContent='Wachtwoord niet gewijzigd: '+e.message}
+     finally{submit.disabled=false}
+   };
+   deleteButton.onclick=async()=>{
+     if(!confirm('CHAUFFEUR DEFINITIEF VERWIJDEREN?\n\n'+dr.display_name+' ('+dr.login+')\n\nHet account en alle sessies worden verwijderd. Historische parkeerbewegingen blijven in het logboek.'))return;
+     const typed=prompt('Typ de exacte gebruikersnaam ter bevestiging:\n'+dr.login,'');
+     if(typed===null)return;
+     if(typed.trim().toLowerCase()!==dr.login){$('manageMsg').textContent='Verwijderen geannuleerd: gebruikersnaam komt niet overeen.';return}
+     deleteButton.disabled=true;
+     try{
+       await request('driver_delete',{driver_id:dr.id,confirm_login:dr.login});
+       created='';$('createdSecret').classList.add('hidden');$('createdSecret').textContent='';$('copyCredentials').classList.add('hidden');
+       await loadDrivers();$('manageMsg').textContent='✓ '+dr.display_name+' is definitief verwijderd. Het logboek blijft bewaard.';
+     }catch(e){$('manageMsg').textContent='Verwijderen mislukt: '+e.message;deleteButton.disabled=false}
+   };
+   list.append(row);
+  }
+  $('manageMsg').textContent='';
  }catch(e){$('manageMsg').textContent='Kan chauffeurs niet ophalen: '+e.message}
 }
 async function createDriver(ev){ev.preventDefault();const name=$('newName').value.trim(),login=$('newLogin').value.trim().toLowerCase();const btn=$('createDriver').querySelector('button[type=submit]');btn.disabled=true;
