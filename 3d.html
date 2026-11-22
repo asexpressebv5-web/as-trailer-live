@@ -71,7 +71,7 @@ aside .foot{margin-top:15px;padding-top:12px;border-top:1px solid #345164;color:
 </header>
 <section id="gate">
 <h1>Virtueel A&S-terrein in 3D</h1>
-<p>Bekijk de echte 3DBAG-gebouwvormen, draai 360°, en zie de actuele trailers uit het live parkeerbord. De parkeerplaatsen zijn nog <b>schematisch geplaatst</b> en nog niet landmeetkundig gekoppeld aan de gebouwen.</p>
+<p>Bekijk de echte 3DBAG-gebouwvormen, draai 360°, en zie de actuele trailers uit het live parkeerbord. De 29 parkeerplaatsen zijn nog <b>schematisch geplaatst</b> en nog niet landmeetkundig gekoppeld aan de gebouwen.</p>
 <div class="tabs"><button id="driverTab" class="active" type="button">🚛 Chauffeur</button><button id="adminTab" type="button">⚙ Planning</button></div>
 <div id="driverFields">
 <div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" autocomplete="username"></div>
@@ -96,7 +96,7 @@ aside .foot{margin-top:15px;padding-top:12px;border-top:1px solid #345164;color:
 </section>
 <aside>
 <h2>🚛 Live trailerplaatsen</h2>
-<p>Dit zijn de bestaande T01–T14-registraties, gekoppeld aan de 3D-weergave. Klik een vak op de kaart of hieronder.</p>
+<p>Dit zijn de bestaande T01–T14-registraties, gekoppeld aan de 3D-weergave. Ook tien vrachtwagenplaatsen en vijf autovakken zijn schematisch op de kaart getekend.</p>
 <div id="liveStatus" class="status">Live status laden…</div>
 <div class="key"><span><span class="dot free"></span>Vrij</span><span><span class="dot busy"></span>Bezet</span><span><span class="dot unknown"></span>Controleren</span></div>
 <div id="slotList"></div>
@@ -235,15 +235,16 @@ async function createRealBuildings(){
  }
  $('infoText').textContent=buildingCount+' panden geladen uit echte 3DBAG-gebouwgeometrie. Tik op een pand of trailerplek.';
 }
-function stall(id,x,z){
- const group=new THREE.Group();group.position.set(x,0,z);group.userData.slot=id;
- const asphalt=new THREE.Mesh(new THREE.PlaneGeometry(4.35,13.8),new THREE.MeshBasicMaterial({color:0x6d8797,transparent:true,opacity:.07,side:THREE.DoubleSide}));
+function stall(id,x,z,kind='trailer',rotation=0){
+ const group=new THREE.Group();group.position.set(x,0,z);group.rotation.y=rotation;group.userData.slot=id;
+ const w=kind==='trailer'?4.35:kind==='truck'?4.8:2.9,d=kind==='trailer'?13.8:kind==='truck'?9.6:5.8;
+ const asphalt=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshBasicMaterial({color:0x6d8797,transparent:true,opacity:.07,side:THREE.DoubleSide}));
  asphalt.rotation.x=-Math.PI/2;asphalt.position.y=.012;group.add(asphalt);
- const points=[[-2.17,-6.8],[-2.17,6.8],[2.17,6.8],[2.17,-6.8]];
+ const points=[[-w/2,-d/2],[-w/2,d/2],[w/2,d/2],[w/2,-d/2]];
  const verts=[];for(let i=0;i<3;i++){verts.push(new THREE.Vector3(points[i][0],.065,points[i][1]),new THREE.Vector3(points[i+1][0],.065,points[i+1][1]))}
  const border=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(verts),new THREE.LineBasicMaterial({color:0xb2cdda,transparent:true,opacity:.9}));group.add(border);
  const marker=labelSprite(id);marker.scale.set(4.2,1.35,1);marker.position.y=2.2;group.add(marker);slotBadges.set(id,marker);
- const clickable=new THREE.Mesh(new THREE.BoxGeometry(4.6,.2,13.9),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));clickable.position.y=.18;clickable.userData.slot=id;group.add(clickable);slotMeshes.set(id,{group,clickable,asphalt,border});
+ const clickable=new THREE.Mesh(new THREE.BoxGeometry(w+.3,.2,d+.3),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));clickable.position.y=.18;clickable.userData.slot=id;group.add(clickable);slotMeshes.set(id,{group,clickable,asphalt,border});
  parking.add(group);
 }
 function buildStalls(){
@@ -251,6 +252,10 @@ function buildStalls(){
   stall('T'+String(i+1).padStart(2,'0'),119+col*5.6,row===0?-72:-48);
  }
  stall('T13',25,-75);stall('T14',19,-75);
+ // Overige plekken uit het 2D-terreinplan, schematisch geprojecteerd.
+ for(let i=0;i<7;i++)stall('V'+String(i+1).padStart(2,'0'),-40+i*6,84,'truck',Math.PI*.11);
+ for(let i=0;i<3;i++)stall('V'+String(i+8).padStart(2,'0'),174,15+i*13,'truck',Math.PI/2);
+ for(const [name,x,z,rot] of [['A02',9,84,.35],['A10',-51,-6,Math.PI/2],['A11',-51,4,Math.PI/2],['A12',-35,25,Math.PI/2],['A16',-65,43,Math.PI/2]])stall(name,x,z,'car',rot);
  const info=labelSprite('LIVE TRAILERPLEKKEN (SCHEMATISCH)','#d5f5ff','#12384b');info.scale.set(48,4.2,1);info.position.set(132,5,-90);parking.add(info);
 }
 function createTrailer(x,z,plate){
@@ -285,15 +290,24 @@ function chooseSlot(id,move){
  selected=id;renderCards();
  const r=liveRows.find(e=>e.slot===id),mat=slotMeshes.get(id);
  $('infoTitle').textContent='Parkeerplaats '+id;
- $('infoText').textContent=!r?'Geen live gegevens':r.trailer?
+ $('infoText').textContent=!r?'Geen live bezettingsgegevens voor dit vak; de exacte positie is nog indicatief.':r.trailer?
     (r.carrier||'Vervoerder onbekend')+' · Kenteken: '+(r.plate||r.trailer)+(r.other_trailer?' · Ander nummer: '+r.other_trailer:''):
     r.confirmed?'Bevestigd vrij. Je kunt hier een trailer parkeren via het 2D-bord.':'Nog niet gecontroleerd. Controleer fysiek of de plek vrij is.';
  if(move&&mat){orbit.target.copy(mat.group.position);camera.position.set(mat.group.position.x+19,32,mat.group.position.z+25);orbit.update()}
 }
+function solarAltitude(date,lat,lon){
+ const rad=Math.PI/180,d=date.getTime()/86400000-0.5+2440588-2451545;
+ const m=rad*(357.5291+0.98560028*d);
+ const C=rad*(1.9148*Math.sin(m)+.02*Math.sin(2*m)+.0003*Math.sin(3*m));
+ const L=m+C+rad*102.9372+Math.PI,e=rad*23.4397;
+ const asc=Math.atan2(Math.sin(L)*Math.cos(e),Math.cos(L));
+ const dec=Math.asin(Math.sin(L)*Math.sin(e)),phi=lat*rad;
+ const ha=rad*(280.16+360.9856235*d)+lon*rad-asc;
+ return Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(ha))/rad;
+}
 function updateLights(){
- const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',hour:'2-digit',hourCycle:'h23'}).format(new Date());
- const hour=Number(localParts);
- const night=manualNight===null?(hour<7||hour>=18):manualNight;
+ const sunAlt=solarAltitude(new Date(),51.84613732,5.80025693);
+ const night=manualNight===null?(sunAlt<-3):manualNight;
  scene.background.set(night?'#070d1a':'#163244');scene.fog.color.copy(scene.background);
  hemi.intensity=night?1.5:2.3;sun.intensity=night?.25:3.1;
  for(const bulb of lamps.children)bulb.intensity=night?2.4:0;
@@ -302,7 +316,7 @@ function updateLights(){
  $('dayNight').classList.toggle('active',night);
 }
 function setupLamps(){
- for(const x of [-36,28,92,154])for(const z of [-75,-5,65]){
+ for(const x of [-28,62,152])for(const z of [-100,-45,10,65,120]){
  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.09,.11,9,8),new THREE.MeshStandardMaterial({color:0x788997,metalness:.7,roughness:.46}));pole.position.set(x,4.5,z);scene.add(pole);
  const lamp=new THREE.PointLight(0xffe4ab,0,28,2);lamp.position.set(x,9,z);lamps.add(lamp);
  const bulb=new THREE.Mesh(new THREE.BoxGeometry(.9,.32,.9),new THREE.MeshBasicMaterial({color:0xffe1a1}));bulb.position.set(x,9,z);scene.add(bulb);
