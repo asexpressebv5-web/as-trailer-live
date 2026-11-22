@@ -28,11 +28,19 @@ body.embed-mode>header{display:none}
 body.embed-mode #login{margin:18px auto 14px}
 body.embed-mode.show-board #board{height:100svh;min-height:100svh}
 body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px 9px}
+.live-parking-entry{display:flex;align-items:center;gap:11px;margin:14px 0 10px;padding:12px 13px;background:#174865;border:1px solid #52a4c8;border-radius:11px;text-decoration:none;color:#edfaff;font-weight:700}
+.live-parking-entry>span:first-child{font-size:24px}
+.live-parking-entry>span:nth-child(2){flex:1;min-width:0}
+.live-parking-entry strong{display:block;font-size:14px}
+.live-parking-entry small{display:block;color:#bedbe8;font-size:11px;font-weight:450;line-height:1.35}
+.live-parking-entry>span:last-child{font-size:25px;color:#96defc}
+.live-parking-entry:hover,.live-parking-entry:focus-visible{background:#1a5d7e;outline:2px solid #8edcff}
 </style>
 </head><body>
 <header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Parkeren en ophalen · versie 48</div></header>
 <section id="login">
 <h1>Waar staat mijn trailer?</h1><p>Bekijk welke trailerplaatsen vrij zijn en zoek een trailer op kenteken of trailernummer. De live plattegrond wijst de juiste plek aan.</p>
+<a href="./live-parkeren.html" class="live-parking-entry"><span>🅿️</span><span><strong>Open A&S Live Parkeren</strong><small>Vrije plaatsen, kentekens en trailerlocaties op één pagina</small></span><span aria-hidden="true">›</span></a>
 <div class="tabs"><button id="driver" type="button" class="on">🚛 Chauffeur</button><button id="planner" type="button">🗂️ Planning</button></div>
 <div id="driverFields"><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div>
 <div id="plannerFields" class="hidden"><div class="field"><label for="adminCode">Beheercode planning</label><input id="adminCode" type="password" maxlength="100" autocomplete="off" placeholder="Privébeheercode"></div></div>
