@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><meta name="theme-color" content="#10253b">
+<title>A&S Expresse | Live trailerplaatsen Nijmegen</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1425;--panel:#122a40;--ink:#eff7ff;--muted:#bad0df;--blue:#5bc1ff;--red:#ffb4bd}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0b1524,#142d45);color:var(--ink);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100svh}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid #2f4c65;gap:15px;flex-wrap:wrap}header .brand{display:flex;align-items:center;gap:12px;font-weight:800}header .mark{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;background:#17659c;color:#fff;font-size:18px}header .small{font-size:12px;color:var(--muted);font-weight:500}header button{background:transparent;border:1px solid #527894;color:#cceaff;padding:8px 11px;border-radius:9px;cursor:pointer}
+section#login{max-width:460px;margin:7svh auto 30px;padding:22px;border:1px solid #385976;border-radius:16px;background:rgba(16,36,56,.94);box-shadow:0 20px 80px #0005}h1{font-size:24px;line-height:1.2;margin:0 0 12px}p{color:var(--muted)}.tabs{display:flex;gap:8px;margin:20px 0}.tabs button{flex:1;background:#203f5b;border:1px solid #54728c;color:#dbeeff;padding:10px;border-radius:9px;cursor:pointer;font-weight:700}.tabs button.on{background:#1976b1;color:white;border-color:#74cbff}
+label{display:block;margin-bottom:6px;font-size:13px;color:#c2d9eb}input{width:100%;padding:14px;background:#0a1b2c;color:#fff;border:1px solid #567c97;border-radius:10px;font-size:16px;outline:0}input:focus{border-color:#66cfff}#submit{display:block;width:100%;padding:13px;margin-top:12px;background:#1886cb;border:1px solid #59c4ff;border-radius:10px;color:white;font-weight:800;font-size:15px;cursor:pointer}button:disabled{opacity:.6}#status{min-height:38px;font-size:13px;color:#fbd3ac}#board{width:100%;min-height:calc(100svh - 76px);height:calc(100svh - 76px);border:0;background:#0b1524;display:none}body.show-board{overflow:hidden}body.show-board #login{display:none}body.show-board #board{display:block}body.show-board header{display:none}#exit{display:none}body.show-board #exit{display:block;position:fixed;z-index:1000;bottom:15px;right:15px;background:#10283a;box-shadow:0 6px 22px #0007}
+@media(max-width:530px){header{padding:9px 12px}section#login{margin:17px 12px;padding:17px;border-radius:12px}h1{font-size:21px}#board{height:100svh;min-height:100svh}}
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="mark">A&S</div><div>Live trailerlocaties<div class="small">Nijmegen · Hogelandsweg 53–55</div></div></div><div class="small">Beveiligd trailerbord</div></header>
+<section id="login"><h1>Waar staat mijn trailer?</h1><p>Bekijk op de plattegrond welke trailer op T01 t/m T14 staat. Alle gegevens komen live uit de planning.</p>
+<div class="tabs"><button type="button" id="driver" class="on">🚛 Chauffeur</button><button type="button" id="planner">🗂️ Planning</button></div>
+<label id="codeLabel" for="code">Toegangscode chauffeur</label><input id="code" type="password" autocomplete="off" autocapitalize="off" placeholder="Voer je toegangscode in" maxlength="100"><button id="submit" type="button">Open live plattegrond</button><div id="status" role="status" aria-live="polite"></div><p style="font-size:12px">Chauffeurs kunnen alleen kijken. Alleen de planning kan trailernummers en parkeerplaatsen wijzigen.</p></section>
+<iframe id="board" title="Interactieve live parkeerplattegrond A&S Nijmegen" loading="eager" referrerpolicy="no-referrer"></iframe><button id="exit" type="button">↩ Uitloggen</button>
+<script>
+(()=>{
+ 'use strict';
+ const END='https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live',DRIVER='as_yard_2026_driver_access_v1',ADMIN='as_yard_2026_planner_access_session_v1';
+ const $=id=>document.getElementById(id);
+ let mode=new URLSearchParams(location.search).has('planning')?'admin':'viewer',running=false;
+ const get=()=>{try{return(mode==='admin'?sessionStorage:localStorage).getItem(mode==='admin'?ADMIN:DRIVER)||''}catch(e){return''}};
+ const set=v=>{try{(mode==='admin'?sessionStorage:localStorage).setItem(mode==='admin'?ADMIN:DRIVER,v)}catch(e){}};
+ const forget=()=>{try{(mode==='admin'?sessionStorage:localStorage).removeItem(mode==='admin'?ADMIN:DRIVER)}catch(e){}};
+ function changeMode(m){mode=m;$('driver').classList.toggle('on',m==='viewer');$('planner').classList.toggle('on',m==='admin');$('codeLabel').textContent=m==='viewer'?'Toegangscode chauffeur':'Beheercode planning';$('code').value='';$('status').textContent='';}
+ function logout(){forget();$('board').removeAttribute('srcdoc');document.body.classList.remove('show-board');$('status').textContent='';$('code').focus()}
+ async function login(code){
+  if(!code){$('status').textContent='Vul eerst de toegangscode in.';return;}
+  if(running)return;running=true;$('submit').disabled=true;$('status').textContent='Beveiligde verbinding maken…';
+  try{
+    const r=await fetch(END+'?api=page',{headers:{'x-yard-access':code},cache:'no-store'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(r.status===401?'De toegangscode klopt niet.':(d.error||'De server geeft een foutmelding.'));
+    if(typeof d.html!=='string'||!d.html.includes('id="yardDashboard"'))throw new Error('De server heeft een ongeldige plattegrond teruggegeven.');
+    set(code);
+    let html=d.html;
+    if(mode==='admin')html=html.replace("let mode=new URLSearchParams(location.search).get('planning')==='1'?'admin':'viewer';","let mode='admin';");
+    else html=html.replace("let mode=new URLSearchParams(location.search).get('planning')==='1'?'admin':'viewer';","let mode='viewer';");
+    $('board').srcdoc=html;
+    document.body.classList.add('show-board');
+    $('status').textContent='';
+  }catch(e){$('status').textContent='⚠ '+(e.message||'Verbinding mislukt. Controleer je internet.');}
+  finally{running=false;$('submit').disabled=false;}
+ }
+ const invite=new URLSearchParams(location.hash.slice(1)).get('toegang');
+ if(invite){try{localStorage.setItem(DRIVER,invite)}catch(e){};try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+ $('driver').onclick=()=>changeMode('viewer');$('planner').onclick=()=>changeMode('admin');
+ $('submit').onclick=()=>login($('code').value.trim());$('code').onkeydown=e=>{if(e.key==='Enter')$('submit').click()};$('exit').onclick=logout;
+ changeMode(mode);if(get())login(get());
+})();
+</script>
+</body></html>
