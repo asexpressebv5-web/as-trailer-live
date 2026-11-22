@@ -198,6 +198,7 @@ const facadeDetails=new THREE.Group();scene.add(facadeDetails);
 $('facades').onclick=()=>{facadeDetails.visible=!facadeDetails.visible;$('facades').classList.toggle('active',facadeDetails.visible)};
 const parking=new THREE.Group();scene.add(parking);
 const buildings=new THREE.Group();scene.add(buildings);
+let verifiedPand53=null;
 const lamps=new THREE.Group();scene.add(lamps);
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
 const slotMeshes=new Map(),slotBadges=new Map(),slotTrailers=new Map();
@@ -250,14 +251,15 @@ async function createRealBuildings(){
  if(!Array.isArray(data.buildings)||data.buildings.length<2)throw new Error('Onvolledige 3D-geometrie');
  let rootLabelCount=0;
  for(const b of data.buildings){
+  if(b.role==='adres53')verifiedPand53=b;
   let added=0;
   for(const kind of ['r','w']){const mesh=createSurfaceMesh(b,kind);if(mesh){buildings.add(mesh);added++}}
   if(!added)continue;
   buildingCount++;
-  if(b.role==='adres53'||b.role==='kandidaat55'){
+  if(b.role==='adres53'||b.role==='onbevestigd'){
     const center=b.v.reduce((a,v)=>{a.x+=v[0];a.y+=v[1];a.z+=v[2];return a},{x:0,y:0,z:0});
     center.x/=b.v.length;center.y/=b.v.length;center.z/=b.v.length;
-    const label=labelSprite(b.role==='adres53'?'GEBOUW 53':'HAL NABIJ 55', '#fff2d6');
+    const label=labelSprite(b.role==='adres53'?'GEBOUW 53':'NABURIG PAND · HUISNR ONBEVESTIGD', '#fff2d6');
     label.position.set(center.x,(b.sourceRoof-9)+5,center.z);
     buildings.add(label);rootLabelCount++;
   }
@@ -291,8 +293,115 @@ function addConceptFacade(){
  rollup(4,13.9,4.4);rollup(13,13.9,4.4);
  for(const x of [41,59,77,95,113])rollup(x,108.1,5.2);
  for(const x of [40,58,76,94,112])window(x,7,108.25,3.2);
- facadeDetails.visible=true;
+ facadeDetails.visible=false;$('facades').classList.remove('active');
 }
+
+/* Echte gevelfoto van gebouw 53: lokaal op de browser, geen upload.
+ * Vier windrichtingen van de officiële 3DBAG-wandvlakken; voorlopig handmatig uitgelijnd.
+ */
+const facadeLocalKey='as_3d_gebouw53_fotos_v1';
+let facadePhotoImage=null,facadePhotoMesh=null;
+function facadeDirectionWall(side){
+ const b=verifiedPand53;if(!b)return null;
+ const xMean=b.v.reduce((s,v)=>s+v[0],0)/b.v.length,zMean=b.v.reduce((s,v)=>s+v[2],0)/b.v.length;
+ const target={N:[0,-1],E:[1,0],S:[0,1],W:[-1,0]}[side];let best=null;
+ for(const f of b.f.filter(x=>x.k==='w')){
+  const pts=(f.r?.[0]||[]).map(i=>b.v[i]).filter(Boolean);if(pts.length<3)continue;
+  const low=Math.min(...pts.map(p=>p[1])),top=Math.max(...pts.map(p=>p[1])),height=top-low;
+  let width=0,start=null,end=null;
+  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+   const d=Math.hypot(pts[i][0]-pts[j][0],pts[i][2]-pts[j][2]);
+   if(d>width){width=d;start=pts[i];end=pts[j]}
+  }
+  if(width<2.5||height<2)continue;
+  const x=pts.reduce((s,p)=>s+p[0],0)/pts.length,z=pts.reduce((s,p)=>s+p[2],0)/pts.length;
+  const vx=x-xMean,vz=z-zMean,r=Math.hypot(vx,vz)||1;
+  const score=6*(vx*target[0]+vz*target[1])/r+Math.log(width+1)*.45;
+  if(!best||score>best.score){
+   let theta=Math.atan2(-(end[2]-start[2]),end[0]-start[0]);
+   if(Math.sin(theta)*vx+Math.cos(theta)*vz<0)theta+=Math.PI;
+   best={score,x,z,low,top,width,height,theta,nx:Math.sin(theta),nz:Math.cos(theta)};
+  }
+ }
+ return best;
+}
+function removeFacadePhoto(){
+ if(!facadePhotoMesh)return;
+ buildings.remove(facadePhotoMesh);
+ facadePhotoMesh.geometry.dispose();facadePhotoMesh.material.map.dispose();facadePhotoMesh.material.dispose();
+ facadePhotoMesh=null;
+}
+function installFacadePhoto(record){
+ const wall=facadeDirectionWall(record.side);if(!wall||!record.img)return Promise.resolve(false);
+ const image=new Image();image.src=record.img;
+ return image.decode().then(()=>{
+  removeFacadePhoto();
+  const texture=new THREE.Texture(image);texture.colorSpace=THREE.SRGBColorSpace;texture.needsUpdate=true;
+  const width=wall.width*.88,height=Math.min(wall.height*.85,width*image.naturalHeight/image.naturalWidth);
+  const mat=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,depthWrite:false});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),mat);
+  mesh.rotation.y=wall.theta;
+  mesh.position.set(wall.x+wall.nx*.19,wall.low+wall.height*.5,wall.z+wall.nz*.19);
+  mesh.renderOrder=15;buildings.add(mesh);facadePhotoMesh=mesh;return true;
+ }).catch(()=>false);
+}
+function focusActualFacade(side){
+ const wall=facadeDirectionWall(side);if(!wall)return;
+ const t=new THREE.Vector3(wall.x,Math.max(2,wall.low+wall.height*.5),wall.z),distance=Math.max(20,wall.width*.9);
+ orbit.target.copy(t);camera.position.copy(t.clone().add(new THREE.Vector3(wall.nx*distance,Math.max(8,distance*.3),wall.nz*distance)));
+ camera.lookAt(t);orbit.update();
+}
+async function setupFacadePhotos(){
+ const stagePanel=document.createElement('section');stagePanel.id='facadePhotoPanel';stagePanel.hidden=true;
+ stagePanel.style.cssText='position:absolute;z-index:22;right:9px;top:67px;width:min(340px,calc(100% - 18px));max-height:calc(100% - 82px);overflow:auto;background:#102d43f5;border:1px solid #68a0be;padding:15px;border-radius:13px;box-shadow:0 12px 40px #000a;color:#effaff';
+ stagePanel.innerHTML='<strong>📷 Echte gevel – gebouw 53</strong><p style="color:#b8d8ea;font-size:12px">Selecteer een windrichting en een eigen foto. De foto blijft alleen op dit apparaat; dit is nog geen automatische gevelscan.</p>'+
+ '<label style="display:block;margin:10px 0">Gevelzijde <select id="facadeSide" style="display:block;width:100%;padding:9px;background:#17394f;color:white;border:1px solid #6ca4be;border-radius:7px"><option value="N">Noord</option><option value="E">Oost</option><option value="S">Zuid</option><option value="W">West</option></select></label>'+
+ '<button id="facadeFocus" type="button" class="tool">🎯 Bekijk deze gevel</button>'+
+ '<label style="display:block;margin:11px 0">Eigen gevel- of laadpoortfoto <input id="facadeFile" accept="image/*" type="file" style="display:block;width:100%;padding:8px;background:#122c42;color:#fff;border:1px solid #4e7b98;border-radius:6px"/></label>'+
+ '<img id="facadePreview" hidden alt="Echte geselecteerde gevel" style="width:100%;max-height:130px;object-fit:contain;border-radius:7px;border:1px solid #62849c"/>'+
+ '<div style="display:flex;gap:7px;margin:12px 0;flex-wrap:wrap"><button id="facadeSave" type="button" class="tool active">Foto plaatsen</button><button id="facadeRemove" type="button" class="tool">Verwijderen</button><button id="facadeClose" type="button" class="tool">Sluiten</button></div>'+
+ '<div id="facadeMessage" role="status" style="font-size:12px;color:#cce5f5"></div><p style="font-size:11px;color:#a7bdcf">Geen foto wordt naar Google, GitHub of onze server gestuurd. Foto kan alleen op dit apparaat worden bekeken.</p>';
+ stage.appendChild(stagePanel);
+ const showMsg=s=>{$('facadeMessage').textContent=s};
+ const button=document.createElement('button');button.id='facadeOpen';button.type='button';button.className='tool';button.textContent='📷 Echte gevel 53';
+ $('tools').appendChild(button);
+ let records={};try{records=JSON.parse(localStorage.getItem(facadeLocalKey)||'{}')}catch{}
+ const showSaved=async()=>{
+  const rec=records[$('facadeSide').value],pre=$('facadePreview');
+  facadePhotoImage=rec?.img||null;pre.hidden=!facadePhotoImage;pre.src=facadePhotoImage||'';
+  if(rec?.img){await installFacadePhoto(rec);showMsg('Bewaarde foto voor deze gevelzijde geladen.')}
+  else{removeFacadePhoto();showMsg('Nog geen echte foto van deze gevel.')}
+ };
+ button.onclick=()=>{stagePanel.hidden=!stagePanel.hidden;button.classList.toggle('active',!stagePanel.hidden);if(!stagePanel.hidden)showSaved()};
+ $('facadeClose').onclick=()=>{stagePanel.hidden=true;button.classList.remove('active')};
+ $('facadeSide').onchange=showSaved;
+ $('facadeFocus').onclick=()=>focusActualFacade($('facadeSide').value);
+ $('facadeFile').onchange=async()=>{
+  const file=$('facadeFile').files?.[0];if(!file||!file.type.startsWith('image/'))return;
+  if(file.size>20000000){showMsg('Foto maximaal 20 MB.');return}
+  const url=URL.createObjectURL(file),img=new Image();img.src=url;
+  try{
+   await img.decode();const sc=Math.min(1,1000/Math.max(img.width,img.height));
+   const canvas=document.createElement('canvas');canvas.width=Math.round(img.width*sc);canvas.height=Math.round(img.height*sc);
+   canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+   facadePhotoImage=canvas.toDataURL('image/jpeg',.72);
+   if(facadePhotoImage.length>1300000)throw new Error('Comprimeren mislukt');
+   $('facadePreview').src=facadePhotoImage;$('facadePreview').hidden=false;showMsg('Foto klaar. Klik Foto plaatsen.');
+  }catch(e){showMsg('Foto kon niet worden verwerkt: '+e.message)}
+  finally{URL.revokeObjectURL(url);$('facadeFile').value=''}
+ };
+ $('facadeSave').onclick=async()=>{
+  if(!facadePhotoImage){showMsg('Kies eerst een echte gevelfoto.');return}
+  const side=$('facadeSide').value,rec={side,img:facadePhotoImage};
+  const next={...records,[side]:rec};
+  try{localStorage.setItem(facadeLocalKey,JSON.stringify(next));records=next}catch{showMsg('Opslag in deze browser is niet beschikbaar.');return}
+  const ok=await installFacadePhoto(rec);
+  showMsg(ok?'✓ Foto op het echte 3DBAG-gevelvlak geplaatst. Alleen lokaal opgeslagen.':'Foto opgeslagen, maar gevelvlak niet gevonden.');
+ };
+ $('facadeRemove').onclick=()=>{const side=$('facadeSide').value;delete records[side];try{localStorage.setItem(facadeLocalKey,JSON.stringify(records))}catch{}removeFacadePhoto();facadePhotoImage=null;$('facadePreview').hidden=true;showMsg('Gevelfoto van deze zijde verwijderd.')};
+ await showSaved();
+}
+
 function stall(id,x,z,kind='trailer',rotation=0){
  const group=new THREE.Group();group.position.set(x,0,z);group.rotation.y=rotation;group.userData.slot=id;
  const w=kind==='trailer'?4.35:kind==='truck'?4.8:2.9,d=kind==='trailer'?13.8:kind==='truck'?9.6:5.8;
@@ -439,7 +548,7 @@ window.addEventListener('as-auth-ok',async ev=>{
  $('liveStatus').className='status ok';$('liveStatus').textContent='● LIVE · '+new Date().toLocaleTimeString('nl-NL');
 });
 try{
- await createRealBuildings();buildStalls();addConceptFacade();setupLamps();updateLights();resize();fitCamera();
+ await createRealBuildings();buildStalls();addConceptFacade();await setupFacadePhotos();setupLamps();updateLights();resize();fitCamera();
  sceneReady=true;
  window.dispatchEvent(new Event('as-three-ready'));
  if(!$('app').hidden)await refresh();
