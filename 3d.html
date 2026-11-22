@@ -89,8 +89,11 @@ aside .foot{margin-top:15px;padding-top:12px;border-top:1px solid #345164;color:
 <button class="tool" id="focus53" type="button">Gebouw 53</button>
 <button class="tool" id="resetview" type="button">Alles bekijken</button>
 <button class="tool" id="dayNight" type="button">🌙 Nacht</button>
+<button class="tool active" id="aerial" type="button">🛰️ Luchtfoto 2026</button>
+<button class="tool active" id="facades" type="button">🚪 Geveldetails (schets)</button>
+<button class="tool" id="showparking" type="button">🅿️ Parkeerplaatsen</button>
 </div>
-<div id="viewhint">Sleep met je vinger om te draaien · knijp om te zoomen · tik op een trailerplek voor informatie</div>
+<div id="viewhint">Sleep om 360° te draaien · knijp om te zoomen · tik op een vak. <strong>Geveldeuren/ramen en parkeerlocaties zijn nog schematisch!</strong></div>
 <div id="info"><strong id="infoTitle">Echte 3D-gebouwvormen</strong><div class="sub" id="infoText">3DBAG-gegevens laden…</div></div>
 <div id="loaderror" hidden></div>
 </section>
@@ -101,7 +104,9 @@ aside .foot{margin-top:15px;padding-top:12px;border-top:1px solid #345164;color:
 <div class="key"><span><span class="dot free"></span>Vrij</span><span><span class="dot busy"></span>Bezet</span><span><span class="dot unknown"></span>Controleren</span></div>
 <div id="slotList"></div>
 <div class="foot">
-<strong>Bron 3D-gebouwen:</strong> <a href="https://3dbag.nl/" target="_blank" rel="noopener" style="color:#9fd8ff">3DBAG</a>, 3D geoinformation research group (TU Delft) en 3DGI, CC BY 4.0. Hoogtes/daken uit geregistreerde 3D-geometrie. Gebouw 55 en de parkeerlocaties moeten nog nader worden ingemeten. Geen Google Earth-extractie.
+<strong>Bron luchtfoto:</strong> PDOK / Beeldmateriaal Nederland, 2026 RGB ortho, CC BY. <a href="https://www.pdok.nl/-/hoge-resolutie-luchtfoto-2026-nu-beschikbaar-bij-pdok" style="color:#9fd8ff" target="_blank" rel="noopener">Broninformatie</a>.
+<br><strong>Andere bronnen:</strong> <a href="https://earth.google.com/web/search/Hogelandseweg+53+Nijmegen" target="_blank" rel="noopener" style="color:#9fd8ff">Bekijk Google Earth</a> · <a href="https://www.mapillary.com/app/?lat=51.84613732&lng=5.80025693&z=17" target="_blank" rel="noopener" style="color:#9fd8ff">Bekijk Mapillary</a>. Alleen links, geen Google-3D-kopie.
+<br><br><strong>Bron 3D-gebouwen:</strong> <a href="https://3dbag.nl/" target="_blank" rel="noopener" style="color:#9fd8ff">3DBAG</a>, 3D geoinformation research group (TU Delft) en 3DGI, CC BY 4.0. Hoogtes/daken uit geregistreerde 3D-geometrie. Gebouw 55 en de parkeerlocaties moeten nog nader worden ingemeten. Geen Google Earth-extractie.
 <br><br>De 3D-app is voorlopig alleen om te bekijken. Parkeren en ophalen blijft via het bestaande <a href="./" style="color:#9fd8ff">2D-trailerbord</a> werken.
 </div>
 </aside>
@@ -167,6 +172,30 @@ const ambient=new THREE.AmbientLight(0x92b5db,.2);scene.add(ambient);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(425,430),new THREE.MeshStandardMaterial({color:0x122734,roughness:.98}));ground.rotation.x=-Math.PI/2;ground.position.y=-.12;ground.receiveShadow=true;scene.add(ground);
 const hardstand=new THREE.Mesh(new THREE.PlaneGeometry(258,262),new THREE.MeshStandardMaterial({color:0x354c56,roughness:1,metalness:0}));hardstand.rotation.x=-Math.PI/2;hardstand.position.set(33,-.07,-5);hardstand.receiveShadow=true;scene.add(hardstand);
 const grid=new THREE.GridHelper(425,85,0x1c394b,0x233c4e);grid.position.y=-.045;scene.add(grid);
+// 2026 open PDOK orthofoto, in RD/EPSG:28992, correct gekoppeld aan de 3DBAG-wereldcoördinaten.
+const pdokParams=new URLSearchParams({
+ service:'WMS',version:'1.3.0',request:'GetMap',layers:'Actueel_orthoHR',
+ styles:'',crs:'EPSG:28992',bbox:[183249.978,428483.393,183674.978,428913.393].join(','),
+ width:'1024',height:'1024',format:'image/jpeg',transparent:'false'
+});
+const pdokUrl='https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0?'+pdokParams.toString();
+const aerialMaterial=new THREE.MeshBasicMaterial({transparent:true,opacity:1,side:THREE.DoubleSide,depthWrite:false});
+const aerialMap=new THREE.Mesh(new THREE.PlaneGeometry(425,430),aerialMaterial);
+aerialMap.rotation.x=-Math.PI/2;aerialMap.position.y=-.115;aerialMap.renderOrder=1;
+scene.add(aerialMap);
+let aerialReady=false;
+new THREE.TextureLoader().load(pdokUrl,texture=>{
+ texture.colorSpace=THREE.SRGBColorSpace;
+ aerialMaterial.map=texture;aerialMaterial.needsUpdate=true;aerialReady=true;
+ $('aerial').classList.add('active');
+},undefined,err=>{
+ aerialMaterial.opacity=0;$('aerial').classList.remove('active');
+ $('aerial').textContent='⚠ Luchtfoto niet bereikbaar';
+ console.warn('PDOK luchtfoto (fallback bestaande ondergrond)',err);
+});
+$('aerial').onclick=()=>{aerialMap.visible=!aerialMap.visible;$('aerial').classList.toggle('active',aerialMap.visible)};
+const facadeDetails=new THREE.Group();scene.add(facadeDetails);
+$('facades').onclick=()=>{facadeDetails.visible=!facadeDetails.visible;$('facades').classList.toggle('active',facadeDetails.visible)};
 const parking=new THREE.Group();scene.add(parking);
 const buildings=new THREE.Group();scene.add(buildings);
 const lamps=new THREE.Group();scene.add(lamps);
@@ -233,7 +262,36 @@ async function createRealBuildings(){
     buildings.add(label);rootLabelCount++;
   }
  }
- $('infoText').textContent=buildingCount+' panden geladen uit echte 3DBAG-gebouwgeometrie. Tik op een pand of trailerplek.';
+ $('infoText').textContent=buildingCount+' panden met echte 3D-daken en gevelvlakken geladen. De weergegeven deuren en ramen zijn voorlopige schetsdetails; geen ingemeten gevelscan.';
+}
+function addConceptFacade(){
+ // Deze geveldetails zijn GEEN verifieerbare geometrie uit 3DBAG of Google; alleen illustratieve conceptlaag.
+ const doorMat=new THREE.MeshStandardMaterial({color:0x9eafbf,roughness:.8,metalness:.28,side:THREE.DoubleSide});
+ const frameMat=new THREE.MeshStandardMaterial({color:0x182c3c,metalness:.7,roughness:.45,side:THREE.DoubleSide});
+ const glassMat=new THREE.MeshStandardMaterial({color:0x39758b,metalness:.58,roughness:.25,side:THREE.DoubleSide});
+ const lineMat=new THREE.MeshBasicMaterial({color:0xc2d5df,side:THREE.DoubleSide});
+ function box(width,height,depth,x,y,z,mat){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(width,height,depth),mat);
+  m.position.set(x,y,z);facadeDetails.add(m);return m;
+ }
+ function rollup(x,z,w=4.6){
+  box(w,4.4,.24,x,2.3,z,frameMat);
+  box(w-.35,4.05,.26,x,2.3,z+.18,doorMat);
+  for(let y=.5;y<4.3;y+=.48)box(w-.35,.035,.3,x,y,z+.39,lineMat);
+  box(.12,4.5,.5,x-w/2,2.4,z,frameMat);box(.12,4.5,.5,x+w/2,2.4,z,frameMat);
+ }
+ function window(x,y,z,w=3){
+  box(w,1.8,.22,x,y,z,frameMat);
+  box(w-.3,1.5,.25,x,y,z+.18,glassMat);
+  box(.08,1.6,.32,x,y,z+.39,lineMat);
+  box(w, .08,.32,x,y,z+.38,lineMat);
+ }
+ // Voorlopige voorbeeldposities, zonder te claimen dat deze deuren/ramen daar echt zitten.
+ for(const x of [-8,0,8,16])window(x,5.0,13.8,2.8);
+ rollup(4,13.9,4.4);rollup(13,13.9,4.4);
+ for(const x of [41,59,77,95,113])rollup(x,108.1,5.2);
+ for(const x of [40,58,76,94,112])window(x,7,108.25,3.2);
+ facadeDetails.visible=true;
 }
 function stall(id,x,z,kind='trailer',rotation=0){
  const group=new THREE.Group();group.position.set(x,0,z);group.rotation.y=rotation;group.userData.slot=id;
@@ -249,14 +307,16 @@ function stall(id,x,z,kind='trailer',rotation=0){
 }
 function buildStalls(){
  for(let i=0;i<12;i++){const row=Math.floor(i/6),col=i%6;
-  stall('T'+String(i+1).padStart(2,'0'),119+col*5.6,row===0?-72:-48);
+  stall('T'+String(i+1).padStart(2,'0'),155+col*6.4,row===0?-97:-73);
  }
- stall('T13',25,-75);stall('T14',19,-75);
- // Overige plekken uit het 2D-terreinplan, schematisch geprojecteerd.
- for(let i=0;i<7;i++)stall('V'+String(i+1).padStart(2,'0'),-40+i*6,84,'truck',Math.PI*.11);
- for(let i=0;i<3;i++)stall('V'+String(i+8).padStart(2,'0'),174,15+i*13,'truck',Math.PI/2);
- for(const [name,x,z,rot] of [['A02',9,84,.35],['A10',-51,-6,Math.PI/2],['A11',-51,4,Math.PI/2],['A12',-35,25,Math.PI/2],['A16',-65,43,Math.PI/2]])stall(name,x,z,'car',rot);
- const info=labelSprite('LIVE TRAILERPLEKKEN (SCHEMATISCH)','#d5f5ff','#12384b');info.scale.set(48,4.2,1);info.position.set(132,5,-90);parking.add(info);
+ stall('T13',158,-38);stall('T14',165,-38);
+ // Parkeerplaatsen in expliciet SCHEMATISCHE demonstratiezone, los van 3DBAG-pandvlakken.
+ for(let i=0;i<7;i++)stall('V'+String(i+1).padStart(2,'0'),-101+i*6.5,113,'truck',Math.PI*.11);
+ for(let i=0;i<3;i++)stall('V'+String(i+8).padStart(2,'0'),195,25+i*19,'truck',Math.PI/2);
+ for(const [name,x,z,rot] of [['A02',-50,116,.35],['A10',-93,-55,Math.PI/2],['A11',-93,-43,Math.PI/2],['A12',-93,-31,Math.PI/2],['A16',-93,-19,Math.PI/2]])stall(name,x,z,'car',rot);
+ const area=new THREE.Mesh(new THREE.PlaneGeometry(58,89),new THREE.MeshBasicMaterial({color:0x0c6582,transparent:true,opacity:.19,depthWrite:false,side:THREE.DoubleSide}));
+ area.rotation.x=-Math.PI/2;area.position.set(171,-.01,-73);area.renderOrder=3;parking.add(area);
+ const info=labelSprite('SCHEMATISCHE PARKEERZONE · NIET IN GEMETEN','#f6e7bd','#16435b');info.scale.set(75,5,1);info.position.set(173,5,-116);parking.add(info);
 }
 function createTrailer(x,z,plate){
  const group=new THREE.Group();group.position.set(0,0,0);
@@ -289,7 +349,7 @@ function renderCards(){
 function chooseSlot(id,move){
  selected=id;renderCards();
  const r=liveRows.find(e=>e.slot===id),mat=slotMeshes.get(id);
- $('infoTitle').textContent='Parkeerplaats '+id;
+ $('infoTitle').textContent='Parkeerplaats '+id+' (schematisch)';
  $('infoText').textContent=!r?'Geen live bezettingsgegevens voor dit vak; de exacte positie is nog indicatief.':r.trailer?
     (r.carrier||'Vervoerder onbekend')+' · Kenteken: '+(r.plate||r.trailer)+(r.other_trailer?' · Ander nummer: '+r.other_trailer:''):
     r.confirmed?'Bevestigd vrij. Je kunt hier een trailer parkeren via het 2D-bord.':'Nog niet gecontroleerd. Controleer fysiek of de plek vrij is.';
@@ -322,8 +382,27 @@ function setupLamps(){
  const bulb=new THREE.Mesh(new THREE.BoxGeometry(.9,.32,.9),new THREE.MeshBasicMaterial({color:0xffe1a1}));bulb.position.set(x,9,z);scene.add(bulb);
  }
 }
-function fitCamera(){camera.position.set(180,135,188);orbit.target.set(46,2,4);orbit.update()}
+function fitCamera(){
+ // Pas 3D-camera ook aan op telefoon: alle gebouwen en het apart getekende parkeerplan in beeld.
+ const box=new THREE.Box3().setFromObject(buildings);box.expandByObject(parking);
+ const center=box.getCenter(new THREE.Vector3());
+ const size=box.getSize(new THREE.Vector3());
+ const radius=Math.max(size.x,size.z)*.68;
+ const aspect=Math.max(.6,stage.clientWidth/Math.max(300,stage.clientHeight));
+ const fov=THREE.MathUtils.degToRad(camera.fov);
+ const distance=Math.max(195,radius/Math.sin(fov/2)/Math.min(1,aspect)*1.2);
+ camera.position.copy(center.clone().add(new THREE.Vector3(distance*.72,distance*.67,distance*.78)));
+ orbit.target.set(center.x,2,center.z);orbit.maxDistance=1000;orbit.update();
+}
 $('resetview').onclick=()=>fitCamera();
+$('showparking').onclick=()=>{
+ const target=new THREE.Vector3(171,0,-73);
+ camera.position.set(223,72,18);
+ orbit.target.copy(target);orbit.update();
+ $('showparking').classList.add('active');
+ $('infoTitle').textContent='29 vakken – schematische locatie';
+ $('infoText').textContent='De echte 2D-vaknummers zijn zichtbaar, maar deze plek is nog niet exact ingemeten op de satellietfoto.';
+};
 $('topview').onclick=()=>{camera.position.set(52,175,7);orbit.target.set(52,0,7);orbit.update()};
 $('perspective').onclick=()=>fitCamera();
 $('focus53').onclick=()=>{camera.position.set(35,41,41);orbit.target.set(-2,5,0);orbit.update()};
@@ -360,7 +439,7 @@ window.addEventListener('as-auth-ok',async ev=>{
  $('liveStatus').className='status ok';$('liveStatus').textContent='● LIVE · '+new Date().toLocaleTimeString('nl-NL');
 });
 try{
- await createRealBuildings();buildStalls();setupLamps();updateLights();resize();
+ await createRealBuildings();buildStalls();addConceptFacade();setupLamps();updateLights();resize();fitCamera();
  sceneReady=true;
  window.dispatchEvent(new Event('as-three-ready'));
  if(!$('app').hidden)await refresh();
