@@ -42,15 +42,15 @@ body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px
 <h1>Waar staat mijn trailer?</h1><p>Bekijk live de parkeerplaatsen en zoek trailers op kenteken. Voor planners: in de beveiligde planningweergave staat nu Vrachtwagenbeheer met 87 geïmporteerde kentekens.</p>
 <a href="./live-parkeren.html" class="live-parking-entry"><span>🅿️</span><span><strong>Open A&S Live Parkeren</strong><small>Vrije plaatsen, kentekens en trailerlocaties op één pagina</small></span><span aria-hidden="true">›</span></a>
 <div class="tabs"><button id="driver" type="button" class="on">🚛 Chauffeur</button><button id="planner" type="button">🗂️ Planning</button></div>
-<div id="driverFields"><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div>
+<div id="driverFields"><div id="deviceFields" hidden><div class="field"><label for="vehiclePlate">Vrachtwagenkenteken</label><select id="vehiclePlate"></select></div></div><div id="legacyFields"><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div></div>
 <div id="plannerFields" class="hidden"><div class="field"><label for="adminCode">Beheercode planning</label><input id="adminCode" type="password" maxlength="100" autocomplete="off" placeholder="Privébeheercode"></div></div>
-<button id="submit" type="button" class="main-button">Inloggen en plattegrond openen</button><div id="status" role="status" aria-live="polite"></div><p class="login-info">Nog geen account? Vraag de planning om een persoonlijke gebruikersnaam en wachtwoord. Wijzigingen worden geregistreerd op naam van de chauffeur.</p>
+<button id="submit" type="button" class="main-button">Inloggen en plattegrond openen</button><div id="status" role="status" aria-live="polite"></div><p class="login-info">Vraag de planning om een activatielink voor je telefoon.</p>
 </section>
 <iframe id="board" title="Live A&S terreinplattegrond" loading="eager" referrerpolicy="no-referrer"></iframe>
 <button id="manage" type="button" class="floating" hidden>⚙ Chauffeursbeheer</button><button id="exit" type="button" class="floating">↩ Uitloggen</button>
 <section id="managePanel" aria-label="Chauffeursbeheer" role="dialog" aria-modal="true" aria-labelledby="manageTitle"><div class="manage-card">
 <div class="manage-top"><h2 id="manageTitle">Chauffeursbeheer</h2><button type="button" id="closeManage" class="small-button">Sluiten</button></div>
-<p>Alleen de planning kan wachtwoorden wijzigen. Je voert het nieuwe wachtwoord tweemaal in. Na opslaan controleert de server meteen of inloggen daarmee lukt. Geef de chauffeur de exacte gebruikersnaam en het nieuwe wachtwoord.</p>
+<h3>Telefoons</h3><button id="makeDeviceLink" type="button" class="small-button">Activatielink maken</button><div class="field"><label for="deviceLink">Link voor chauffeur</label><input id="deviceLink" readonly></div><div id="deviceList" class="accounts"></div><hr class="line"><p>Alleen de planning kan wachtwoorden wijzigen. Je voert het nieuwe wachtwoord tweemaal in. Na opslaan controleert de server meteen of inloggen daarmee lukt. Geef de chauffeur de exacte gebruikersnaam en het nieuwe wachtwoord.</p>
 <form id="createDriver" class="row"><div class="field"><label for="newName">Naam chauffeur</label><input id="newName" required maxlength="90" placeholder="Voornaam achternaam"></div><div class="field"><label for="newLogin">Gebruikersnaam</label><input id="newLogin" required maxlength="40" pattern="[a-z0-9._-]{3,40}" autocapitalize="none" placeholder="bijv. voornaam.achternaam"></div><button type="submit" class="small-button">+ Chauffeur toevoegen</button></form>
 <div id="createdSecret" class="notice hidden" role="status" aria-live="polite"></div><button id="copyCredentials" class="small-button hidden" type="button">Inloggegevens kopiëren</button><div id="manageMsg" class="subtle" aria-live="polite"></div>
 <hr class="line"><div class="manage-top"><h3>Chauffeursaccounts</h3><button id="refreshDrivers" type="button" class="small-button">Verversen</button></div><div id="driverList" class="accounts"></div>
@@ -72,6 +72,62 @@ async function request(api,payload,credential=get()){
 const r=await fetch(API+'?api='+encodeURIComponent(api),{method:payload===undefined?'GET':'POST',headers:{'x-yard-access':credential,...(payload===undefined?{}:{'content-type':'application/json'})},body:payload===undefined?undefined:JSON.stringify(payload),cache:'no-store'});
 let d={};try{d=await r.json()}catch{}if(!r.ok){const e=new Error(d.error||'Verbinding met server mislukt ('+r.status+')');e.status=r.status;throw e}return d;
 }
+
+const DEVICE='as_yard_device_v1', LAST='as_yard_last_vehicle_v1';
+function deviceToken(){return localStorage.getItem(DEVICE)||''}
+function randomDeviceToken(){return Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('')}
+async function deviceOptions(){
+ const token=deviceToken();
+ if(!token)return false;
+ try{
+  const result=await request('device_plates',undefined,'driver:'+token+':');
+  const selection=$('vehiclePlate');
+  const previous=localStorage.getItem(LAST);
+  selection.replaceChildren(new Option('Kies een kenteken',''));
+  for(const truck of result.trucks)selection.add(new Option(truck.plate,truck.plate_key));
+  if(result.trucks.some(truck=>truck.plate_key===previous))selection.value=previous;
+  $('deviceFields').hidden=false;
+  $('legacyFields').hidden=true;
+  $('submit').textContent='Plattegrond openen';
+  return true;
+ }catch(error){
+  if(error.status===401){localStorage.removeItem(DEVICE);clear()}
+  message(error.message);
+  return false;
+ }
+}
+async function activateDevice(){
+ const match=/^#activate=([a-f0-9]{64})$/.exec(location.hash);
+ if(!match)return;
+ const token=randomDeviceToken();
+ await request('device_activate',{code:match[1],token},'');
+ localStorage.setItem(DEVICE,token);
+ history.replaceState(null,'',location.pathname+location.search);
+ clear();
+}
+async function loadDevices(){
+ const list=$('deviceList');
+ list.textContent='Telefoons laden…';
+ try{
+  const data=await request('devices');
+  list.replaceChildren();
+  for(const item of data.devices){
+   const row=document.createElement('div');row.className='account';
+   const label=document.createElement('span');
+   const date=item.activated_at||item.activation_expires_at;
+   label.textContent=(item.activated_at?'Gekoppeld op ':'Link geldig tot ')+new Date(date).toLocaleString('nl-NL')+' · '+item.id.slice(0,8);
+   const button=document.createElement('button');button.className='small-button';button.textContent='Intrekken';
+   button.onclick=async()=>{
+    button.disabled=true;
+    try{await request('device_revoke',{id:item.id});await loadDevices()}
+    catch(error){$('manageMsg').textContent=error.message;button.disabled=false}
+   };
+   row.append(label,button);list.append(row);
+  }
+  if(!data.devices.length)list.textContent='Geen gekoppelde telefoons of openstaande links.';
+ }catch(error){list.textContent=error.message}
+}
+
 async function openBoard(credential){
  const data=await request('page',undefined,credential);
  if(typeof data.html!=='string'||!data.html.includes('id="yardDashboard"'))throw new Error('De plattegrond kon niet worden geladen.');
@@ -85,22 +141,27 @@ async function login(){
  if(working)return;working=true;$('submit').disabled=true;message('Inloggen…');
  try{
   let token;
-  if(mode==='driver'){
+  if(mode==='driver'&&deviceToken()){
+   const plate=$('vehiclePlate').value;
+   if(!plate)throw new Error('Kies je vrachtwagenkenteken.');
+   token='driver:'+deviceToken()+':'+plate;
+   localStorage.setItem(LAST,plate);
+  }else if(mode==='driver'){
    const username=$('username').value.trim().toLowerCase(),password=$('password').value;
    if(!username||!password)throw new Error('Vul je gebruikersnaam en wachtwoord in.');
    const d=await request('driver_login',{login:username,password},'');
    token='driver:'+d.token;
    $('password').value='';
   }else{token=$('adminCode').value.trim();if(!token)throw new Error('Vul de beheercode in.');}
-  await openBoard(token);set(token);$('adminCode').value='';
+  set(token);await openBoard(token);$('adminCode').value='';
  }catch(e){message('⚠ '+e.message)}finally{working=false;$('submit').disabled=false}
 }
-async function autoLogin(){const token=get();if(!token)return;if(mode==='driver'&&!token.startsWith('driver:')){clear();return}
+async function autoLogin(){if(mode==='driver'&&await deviceOptions())return;const token=get();if(!token)return;if(mode==='driver'&&!token.startsWith('driver:')){clear();return}
  try{await openBoard(token)}catch(e){clear();message('Je vorige sessie is verlopen. Log opnieuw in.')}
 }
-async function logout(){const token=get();if(mode==='driver'&&token.startsWith('driver:')){try{await request('driver_logout',{},token)}catch{}}
- clear();$('board').removeAttribute('srcdoc');document.body.classList.remove('show-board');$('managePanel').classList.remove('open');$('manage').hidden=true;message('Uitgelogd.');$('username').focus()}
-function showManage(){if(mode!=='admin')return;$('managePanel').classList.add('open');loadDrivers()}
+async function logout(){const token=get();if(mode==='driver'&&token.startsWith('driver:')&&!deviceToken()){try{await request('driver_logout',{},token)}catch{}}
+ clear();$('board').removeAttribute('srcdoc');document.body.classList.remove('show-board');$('managePanel').classList.remove('open');$('manage').hidden=true;message(deviceToken()?'Kies je vrachtwagenkenteken.':'Uitgelogd.');(deviceToken()?$('vehiclePlate'):$('username')).focus()}
+function showManage(){if(mode!=='admin')return;$('managePanel').classList.add('open');loadDrivers();loadDevices()}
 function generatePassword(){
  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%';
  const bytes=crypto.getRandomValues(new Uint8Array(20));
@@ -204,7 +265,22 @@ $('driver').onclick=()=>changeMode('driver');$('planner').onclick=()=>changeMode
 $('exit').onclick=logout;$('manage').onclick=showManage;$('closeManage').onclick=()=>$('managePanel').classList.remove('open');$('refreshDrivers').onclick=loadDrivers;$('refreshEvents').onclick=showEvents;$('createDriver').onsubmit=createDriver;
 $('copyCredentials').onclick=async()=>{try{await navigator.clipboard.writeText(created);$('manageMsg').textContent='Inloggegevens gekopieerd'}catch(e){$('manageMsg').textContent='Selecteer en kopieer de gegevens hierboven.'}};
 let suggestionLock=false;$('newName').addEventListener('input',()=>{if(suggestionLock)return;const n=$('newName').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ._-]/g,'').replace(/\s+/g,'.').slice(0,40);$('newLogin').value=n});$('newLogin').addEventListener('input',()=>{suggestionLock=true});
-changeMode(mode);autoLogin();
+$('makeDeviceLink').onclick=async()=>{
+ const button=$('makeDeviceLink');
+ button.disabled=true;
+ try{
+  const data=await request('device_create',{});
+  $('deviceLink').value=data.url;
+  $('deviceLink').select();
+  await loadDevices();
+ }catch(error){$('manageMsg').textContent=error.message}
+ finally{button.disabled=false}
+};
+changeMode(mode);
+(async()=>{
+ try{if(mode==='driver')await activateDevice();await autoLogin()}
+ catch(error){message(error.message)}
+})();
 })();
 </script>
 </body></html>
