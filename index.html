@@ -42,9 +42,9 @@ body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px
 <h1>Waar staat mijn trailer?</h1><p>Bekijk live de parkeerplaatsen en zoek trailers op kenteken. Voor planners: in de beveiligde planningweergave staat nu Vrachtwagenbeheer met 87 geïmporteerde kentekens.</p>
 <a href="./live-parkeren.html" class="live-parking-entry"><span>🅿️</span><span><strong>Open A&S Live Parkeren</strong><small>Vrije plaatsen, kentekens en trailerlocaties op één pagina</small></span><span aria-hidden="true">›</span></a>
 <div class="tabs"><button id="driver" type="button" class="on">🚛 Chauffeur</button><button id="planner" type="button">🗂️ Planning</button></div>
-<div id="driverFields"><div id="deviceFields" hidden><div class="field"><label for="vehiclePlate">Vrachtwagenkenteken</label><select id="vehiclePlate"></select></div></div><div id="legacyFields"><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div></div>
+<div id="driverFields"><div id="deviceFields" hidden><div class="field"><label for="vehiclePlate">Vrachtwagenkenteken</label><select id="vehiclePlate"></select></div></div><div id="legacyFields" hidden><div class="field"><label for="username">Gebruikersnaam chauffeur</label><input id="username" type="text" maxlength="40" autocapitalize="none" autocomplete="username" placeholder="Bijv. jan.jansen"></div><div class="field"><label for="password">Persoonlijk wachtwoord</label><input id="password" type="password" maxlength="80" autocomplete="current-password" placeholder="Wachtwoord van de planning"></div></div></div>
 <div id="plannerFields" class="hidden"><div class="field"><label for="adminCode">Beheercode planning</label><input id="adminCode" type="password" maxlength="100" autocomplete="off" placeholder="Privébeheercode"></div></div>
-<button id="submit" type="button" class="main-button">Inloggen en plattegrond openen</button><div id="status" role="status" aria-live="polite"></div><p class="login-info">Vraag de planning om een activatielink voor je telefoon.</p>
+<button id="submit" type="button" hidden class="main-button">Inloggen en plattegrond openen</button><div id="status" role="status" aria-live="polite"></div><p id="activationHint" class="login-info">Open de activatielink die je van de planning hebt gekregen in de browser van je telefoon.</p>
 </section>
 <iframe id="board" title="Live A&S terreinplattegrond" loading="eager" referrerpolicy="no-referrer"></iframe>
 <button id="manage" type="button" class="floating" hidden>⚙ Chauffeursbeheer</button><button id="exit" type="button" class="floating">↩ Uitloggen</button>
@@ -59,6 +59,7 @@ body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px
 <script>
 (()=>{
 'use strict';
+const LEGACY=new URLSearchParams(location.search).get('legacy')==='1';
 const EMBED=new URLSearchParams(location.search).get('embed')==='1';if(EMBED)document.body.classList.add('embed-mode');
 const API='https://invndpshvdprqvgmzspx.supabase.co/functions/v1/as-yard-live', DRIVER='as_yard_2026_driver_access_v1', ADMIN='as_yard_2026_planner_access_session_v1';
 const $=id=>document.getElementById(id);
@@ -67,7 +68,7 @@ function get(){try{return(mode==='admin'?sessionStorage:localStorage).getItem(mo
 function set(v){try{(mode==='admin'?sessionStorage:localStorage).setItem(mode==='admin'?ADMIN:DRIVER,v)}catch{}}
 function clear(){try{(mode==='admin'?sessionStorage:localStorage).removeItem(mode==='admin'?ADMIN:DRIVER)}catch{}}
 function message(s){$('status').textContent=s}
-function changeMode(m){mode=m;$('driver').classList.toggle('on',m==='driver');$('planner').classList.toggle('on',m==='admin');$('driverFields').classList.toggle('hidden',m==='admin');$('plannerFields').classList.toggle('hidden',m!=='admin');message('');$('password').value='';$('adminCode').value=''}
+function changeMode(m){mode=m;$('driver').classList.toggle('on',m==='driver');$('planner').classList.toggle('on',m==='admin');$('driverFields').classList.toggle('hidden',m==='admin');$('plannerFields').classList.toggle('hidden',m!=='admin');$('activationHint').hidden=m==='admin';$('legacyFields').hidden=m!=='driver'||!LEGACY;$('submit').hidden=m==='driver'&&!LEGACY;$('deviceFields').hidden=true;$('submit').textContent='Inloggen en plattegrond openen';message('');$('password').value='';$('adminCode').value=''}
 async function request(api,payload,credential=get()){
 const r=await fetch(API+'?api='+encodeURIComponent(api),{method:payload===undefined?'GET':'POST',headers:{'x-yard-access':credential,...(payload===undefined?{}:{'content-type':'application/json'})},body:payload===undefined?undefined:JSON.stringify(payload),cache:'no-store'});
 let d={};try{d=await r.json()}catch{}if(!r.ok){const e=new Error(d.error||'Verbinding met server mislukt ('+r.status+')');e.status=r.status;throw e}return d;
@@ -88,7 +89,8 @@ async function deviceOptions(){
   if(result.trucks.some(truck=>truck.plate_key===previous))selection.value=previous;
   $('deviceFields').hidden=false;
   $('legacyFields').hidden=true;
-  $('submit').textContent='Plattegrond openen';
+  $('activationHint').hidden=true;
+  if(mode==='driver'){$('submit').hidden=false;$('submit').textContent='Plattegrond openen'}
   return true;
  }catch(error){
   if(error.status===401){localStorage.removeItem(DEVICE);clear()}
@@ -138,7 +140,7 @@ async function openBoard(credential){
  $('manage').hidden=mode!=='admin';message('');
 }
 async function login(){
- if(working)return;working=true;$('submit').disabled=true;message('Inloggen…');
+ if(working||$('submit').hidden)return;working=true;$('submit').disabled=true;message('Inloggen…');
  try{
   let token;
   if(mode==='driver'&&deviceToken()){
@@ -260,7 +262,7 @@ async function createDriver(ev){ev.preventDefault();const name=$('newName').valu
  catch(e){$('manageMsg').textContent='Account niet aangemaakt: '+e.message}finally{btn.disabled=false}}
 async function showEvents(){const list=$('eventList');list.textContent='Logboek laden…';try{const d=await request('events');list.replaceChildren();if(!d.events.length){list.textContent='Nog geen trailerbewegingen geregistreerd.';return}
  for(const ev of d.events){const row=document.createElement('div');row.className='account';const label=document.createElement('span');const date=new Date(ev.time).toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});const act=({'park':'geparkeerd','pickup':'meegenomen','confirm_free':'plek leeg gecontroleerd','admin_assign':'ingedeeld','admin_clear':'vrijgemeld'})[ev.action]||ev.action;const company=({'DFDS WIJCHEN':'DFDS Wijchen','CURRIE':'Currie','FEDEX':'FedEx','A&S':'A&S','OVERIG':'Overig'})[ev.carrier]||'';label.textContent=[date,ev.actor_name,act,ev.slot,company,ev.plate||ev.trailer,ev.other_trailer?'ander nr: '+ev.other_trailer:''].filter(Boolean).join(' · ');row.append(label);list.append(row)}}catch(e){list.textContent='Logboek niet bereikbaar: '+e.message}}
-$('driver').onclick=()=>changeMode('driver');$('planner').onclick=()=>changeMode('admin');$('submit').onclick=login;
+$('driver').onclick=()=>{changeMode('driver');void autoLogin()};$('planner').onclick=()=>changeMode('admin');$('submit').onclick=login;
 ['username','password','adminCode'].forEach(id=>$(id).addEventListener('keydown',e=>{if(e.key==='Enter')login()}));
 $('exit').onclick=logout;$('manage').onclick=showManage;$('closeManage').onclick=()=>$('managePanel').classList.remove('open');$('refreshDrivers').onclick=loadDrivers;$('refreshEvents').onclick=showEvents;$('createDriver').onsubmit=createDriver;
 $('copyCredentials').onclick=async()=>{try{await navigator.clipboard.writeText(created);$('manageMsg').textContent='Inloggegevens gekopieerd'}catch(e){$('manageMsg').textContent='Selecteer en kopieer de gegevens hierboven.'}};
