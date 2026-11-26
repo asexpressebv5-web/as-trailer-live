@@ -54,6 +54,7 @@ body.embed-mode.show-board #exit{bottom:8px;right:8px;font-size:12px;padding:7px
 <form id="createDriver" class="row"><div class="field"><label for="newName">Naam chauffeur</label><input id="newName" required maxlength="90" placeholder="Voornaam achternaam"></div><div class="field"><label for="newLogin">Gebruikersnaam</label><input id="newLogin" required maxlength="40" pattern="[a-z0-9._-]{3,40}" autocapitalize="none" placeholder="bijv. voornaam.achternaam"></div><button type="submit" class="small-button">+ Chauffeur toevoegen</button></form>
 <div id="createdSecret" class="notice hidden" role="status" aria-live="polite"></div><button id="copyCredentials" class="small-button hidden" type="button">Inloggegevens kopiëren</button><div id="manageMsg" class="subtle" aria-live="polite"></div>
 <hr class="line"><div class="manage-top"><h3>Chauffeursaccounts</h3><button id="refreshDrivers" type="button" class="small-button">Verversen</button></div><div id="driverList" class="accounts"></div>
+<hr class="line"><section aria-labelledby="movementTitle"><div class="manage-top"><h3 id="movementTitle">Trailerlogboek</h3><button type="button" class="small-button" id="movementRefresh">Verversen</button></div><div class="row"><button type="button" class="small-button" id="movementPDF">PDF downloaden</button><button type="button" class="small-button" id="movementExcel">Excel downloaden</button></div><p id="movementStatus" aria-live="polite"></p><div style="overflow:auto;max-height:55vh"><table id="movementTable" style="min-width:1100px;text-align:left;border-spacing:10px 7px"><thead></thead><tbody></tbody></table></div><button id="movementMore" class="small-button" type="button" hidden>Oudere bewegingen laden</button></section>
 <hr class="line"><div class="manage-top"><h3>Laatste parkeerbewegingen</h3><button id="refreshEvents" type="button" class="small-button">Logboek laden</button></div><div id="eventList" class="accounts"></div>
 </div></section>
 <script>
@@ -184,7 +185,45 @@ async function autoLogin(){if(mode==='driver'&&activationCode()){showPhoneName()
 }
 async function logout(){const token=get();if(mode==='driver'&&token.startsWith('driver:')&&!deviceToken()){try{await request('driver_logout',{},token)}catch{}}
  clear();$('board').removeAttribute('srcdoc');document.body.classList.remove('show-board');$('managePanel').classList.remove('open');$('manage').hidden=true;message(deviceToken()?'Kies je vrachtwagenkenteken.':'Uitgelogd.');(deviceToken()?$('vehiclePlate'):$('username')).focus()}
-function showManage(){if(mode!=='admin')return;$('managePanel').classList.add('open');loadDrivers();loadDevices()}
+const movementCols=['Datum en tijd (NL)','Handeling','Chauffeur','Kenteken trekker','Vak','Vervoerder','Trailerkenteken','Ander trailernr.','Opmerking','Oude registratie'];
+const movementHeader=$('movementTable').tHead.insertRow();
+for(const title of movementCols){const th=document.createElement('th');th.scope='col';th.textContent=title;movementHeader.append(th)}
+let movementCursor=null,movementVersion=0;
+async function loadMovements(append=false){
+ const version=++movementVersion;
+ const url=new URL(API);url.searchParams.set('api','movement_log');
+ if(append&&movementCursor)url.searchParams.set('before',movementCursor);
+ const tbody=$('movementTable').tBodies[0];if(!append)tbody.replaceChildren();
+ $('movementMore').hidden=true;$('movementStatus').textContent='Logboek laden…';
+ try{
+  const r=await fetch(url,{headers:{'x-yard-access':get()},cache:'no-store'});
+  if(!r.ok)throw Error('Logboek ophalen mislukt.');
+  const data=await r.json();if(version!==movementVersion||mode!=='admin')return;
+  for(const e of data.events){
+   const row=tbody.insertRow();
+   const time=new Date(e.time).toLocaleString('nl-NL',{timeZone:'Europe/Amsterdam',dateStyle:'short',timeStyle:'medium'});
+   for(const value of [time,e.action==='park'?'Geparkeerd':'Meegenomen',e.driver_name_at_event||'Niet vastgelegd',e.truck_plate_at_event||'Niet vastgelegd',e.slot,e.carrier,e.plate||(!e.other_trailer?e.trailer:''),e.other_trailer,e.note,e.driver_name_at_event?'':e.actor_name])row.insertCell().textContent=value||'–';
+  }
+  movementCursor=data.next;$('movementMore').hidden=!data.next;
+  $('movementStatus').textContent=tbody.rows.length?tbody.rows.length+' bewegingen in beeld. Downloads bevatten het hele trailerlogboek.':'Nog geen parkeer- of ophaalbewegingen.';
+ }catch(e){if(version===movementVersion)$('movementStatus').textContent=e.message}
+}
+async function downloadMovements(button,format){
+ button.disabled=true;
+ try{
+  const endpoint=API.replace(/as-yard-live$/,'as-yard-movement-export')+'?format='+format;
+  const r=await fetch(endpoint,{headers:{'x-yard-access':get()},cache:'no-store'});
+  if(!r.ok)throw Error('Download mislukt. Controleer je plannerssessie en probeer opnieuw.');
+  const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');
+  a.href=url;a.download='AS-parkeerbewegingen.'+format;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ }catch(e){$('movementStatus').textContent=e.message}finally{button.disabled=false}
+}
+$('movementRefresh').onclick=()=>loadMovements();
+$('movementMore').onclick=()=>loadMovements(true);
+$('movementPDF').onclick=e=>downloadMovements(e.currentTarget,'pdf');
+$('movementExcel').onclick=e=>downloadMovements(e.currentTarget,'xlsx');
+
+function showManage(){if(mode!=='admin')return;$('managePanel').classList.add('open');loadDrivers();loadDevices();loadMovements()}
 function generatePassword(){
  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%';
  const bytes=crypto.getRandomValues(new Uint8Array(20));
